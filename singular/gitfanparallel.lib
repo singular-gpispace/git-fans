@@ -1,0 +1,786 @@
+////////////////////////////////////////////////////////////
+//
+version = "(v1.0, 2020-12-30)";
+category = " Algebraic Geometry";
+info = "";
+
+
+LIB "customstd.lib";
+LIB "linalg.lib";
+LIB "multigrading.lib";
+LIB "parallel.lib";
+
+proc mod_init()
+{
+  // Invoked on loading the library
+  LIB "gfanlib.so";
+  LIB "gitfan.so";
+  newstruct("permutation","intvec image");
+  system("install","permutation","*",composePermutations,2);
+  system("install","permutation","^",permutationPower,2);
+  system("install","permutation","print",printPermutation,1);
+}
+
+////////////////////////////////////////////////////////////
+// Methods that may be useful for testing                 //
+////////////////////////////////////////////////////////////
+
+proc isValidHash(list OC, intvec hash)
+{
+  list selectedOC = OC[hash];
+  cone c = convexIntersection(selectedOC);
+  bigintmat p = relativeInteriorPoint(c);
+  intvec actHash;
+
+  for(int i = 1; i <= size(OC); i++)
+  {
+    if(containsInSupport(OC[i], p))
+    {
+      actHash[size(actHash)+1] = i;
+    }
+  }
+  // Eliminate zero at actHash[1]
+  if (size(actHash) > 1)
+  {
+    actHash = intvec(actHash[2..size(actHash)]);
+  }
+
+  return(hash==actHash);
+}
+
+////////////////////////////////////////////////////////////
+// Methods for permutation operations                     //
+////////////////////////////////////////////////////////////
+
+static proc composePermutations(permutation sigma, permutation tau){
+  intvec sigmaTauImage;
+
+  for (int i=1;i<=size(sigma.image);i++){
+    sigmaTauImage[i]=sigma.image[tau.image[i]];
+  }
+
+  permutation sigmaTau;
+  sigmaTau.image = sigmaTauImage;
+  return(sigmaTau);
+}
+
+
+static proc permutationPower(permutation sigma, int k){
+  int i;
+  if (k==0)
+  {
+    permutation identity;
+    identity.image = intvec(1..size(sigma.image));
+    return (identity);
+  }
+  if (k<0)
+  {
+    // if k<0 invert sigma and replace k with -k
+    intvec sigmaImage = sigma.image;
+    for (i=1; i<=size(sigmaImage); i++)
+    {
+      sigma.image[sigmaImage[i]] = i;
+    }
+    k = -k;
+  }
+  permutation sigmaToPowerK = sigma;
+  for (i=2; i<=k; i++)
+  {
+    sigmaToPowerK = composePermutations(sigmaToPowerK, sigma);
+  }
+  return (sigmaToPowerK);
+}
+
+proc permutationFromIntvec(intvec sigmaImage)
+{
+  permutation sigma;
+  sigma.image = sigmaImage;
+  return (sigma);
+}
+
+proc minimalRepresentative(intvec elem, list groupAction)
+{
+  bigint biMin = binaryToBigint(elem);
+  bigint biCur;
+  intvec cur;
+  for (int i = 1; i <= size(groupAction); i++)
+  {
+    cur = composeIntvecs(groupAction[i].image, elem);
+    biCur = binaryToBigint(cur);
+    if (biCur < biMin)
+    {
+      biMin = biCur;
+    }
+  }
+  return(bigintToBinary(biMin, size(groupAction[1].image)));
+}
+
+proc toMinimalRepresentatives(list elems, list groupAction)
+{
+  for (int i = 1; i <= size(elems); i++)
+  {
+    elems[i] = minimalRepresentative(elems[i], groupAction);
+  }
+  return(elems);
+}
+
+static proc emptyString(int n)
+{
+  string st;
+  for (int i = 1; i<=n;i++){
+    st=st+" ";
+  }
+  return(st);
+}
+
+static proc printPermutation(permutation sigma)
+{
+  intvec v = sigma.image;
+  string vsrc,vimg;
+  for (int i = 1; i<=size(v);i++){
+    vsrc=vsrc+emptyString(1+size(string(size(v)))-size(string(i)))+string(i);
+  }
+  for (i = 1; i<=size(v);i++){
+    vimg=vimg+emptyString(1+size(string(size(v)))-size(string(v[i])))+string(v[i]);
+  }
+  print("|"+vsrc+"|");
+  print("|"+vimg+"|");
+}
+
+////////////////////////////////////////////////////////////////////
+// Methods for computing the symmetry group action and its orbits //
+////////////////////////////////////////////////////////////////////
+
+proc trivialGroupAction(int dimension)
+{
+  list groupAction;
+  groupAction[1] = permutationFromIntvec(intvec(1..dimension));
+  return(groupAction);
+}
+
+static proc pivotIndices(matrix H)
+{
+  intvec p;
+  int pp;
+  int i,j;
+  int l=1;
+  for (i=1; i<=ncols(H); i++)
+  {
+    for (j=nrows(H); j>=0; j--)
+    {
+      if (H[j,i]!=0)
+      {
+        if (j>pp)
+        {
+          p[l] = i;
+          l++;
+          pp = j;
+        }
+        break;
+      }
+    }
+  }
+  return (p);
+}
+
+static proc perm2mat(intvec sig, intvec indices, intmat Q)
+{
+  intvec sigind = 1:size(indices);
+  for(int i = 1; i <= size(indices); i++){
+    if(indices[i] > size(sig)){
+      sigind[i] = indices[i];
+    } else {
+      sigind[i] = sig[indices[i]];
+    }
+  }
+  intmat Asig[size(indices)][ncols(Q)];
+  for(i = 1; i <= size(sigind); i++){
+    Asig[i,1..ncols(Q)] = Q[sigind[i], 1..ncols(Q)];
+  }
+  // the new basis must be in the cols:
+  return(transpose(Asig));
+}
+
+static proc matrixToIntmat(matrix A){
+  int i,j;
+  intmat Aint[nrows(A)][ncols(A)];
+  for(i = 1; i<=nrows(A); i++){
+    for(j = 1; j<=ncols(A); j++){
+      if (deg(A[i,j])>0){ERROR("entries should be constants");}
+      if (denominator(number(A[i,j]))!=1){ERROR("entries should be integers");}
+      Aint[i,j]=int(number(A[i,j]));
+    }
+  }
+  return(Aint);
+}
+
+proc groupActionOnQImage(list G,intmat Q)
+"USAGE: groupActionOnQImage(G,Q); G: list of permutations, Q: intmat
+PURPOSE: Given the group G of permutations acting on the simplex on ncols(Q) objects, computes the corresponding group action on the image of Q.
+RETURN: list of matrices
+"
+{
+  // Construct a basering with characteristic 0.
+  ring r = 0,x,dp;
+  matrix Qmat = matrix(Q);
+  matrix H = gauss_nf(Qmat);
+  intvec indices = pivotIndices(H);
+  intmat Qbasis[nrows(Q)][size(indices)]=Q[1..nrows(Q),indices];
+  matrix QbasisInv = inverse(Qbasis);
+  list L;
+  intmat Qt = transpose(Q);
+  for(int i = 1; i <= size(G); i++){
+    intmat Bsig = perm2mat(G[i].image, indices,Qt);
+    matrix Asig = Bsig * QbasisInv;
+    L[size(L)+1] = matrixToIntmat(Asig);
+    kill Bsig;
+    kill Asig;
+  }
+  return(L);
+}
+
+static proc preimageCone(cone c, intmat A){
+  bigintmat ineqs = inequalities(c);
+  cone cc = canonicalizeCone(coneViaInequalities (ineqs * A));
+  return(cc);
+}
+
+proc groupActionOnHashes(list Asigma, list OCmov)
+"USAGE: groupActionOnHashes(Asigma,OCmov); Asigma: list, OCmov: list of list of cones
+PURPOSE: From the list of orbits of orbitcones, and the symmetry group represenation given by the matrices in Asigma, compute the corresponding permutation representation of the symmetry group on the orbit cones. The permutations are specified in a map representation of length the sum of the size of the orbits of OCmov.
+RETURN: list of permutations
+"
+{
+  list Ind;
+  int i,j,b,k,sizepreviousorbits;
+  list remaining;
+  intmat A;
+  cone c,invAc;
+  for(i = 1; i<=size(Asigma); i++){
+    intvec vInvA;
+    A = intmat(Asigma[i]);
+    sizepreviousorbits=0;
+    for(b = 1; b <= size(OCmov); b++){
+      remaining = intvecToList(intvec(1..size(OCmov[b])));
+      for(j = 1; j <= size(OCmov[b]); j++){
+        invAc = preimageCone(OCmov[b][j], A);
+
+        // find out index:
+        for(k= 1; k <= size(remaining); k++){
+          if(OCmov[b][remaining[k]] == invAc){
+            vInvA[j+sizepreviousorbits] = remaining[k]+sizepreviousorbits;
+            remaining = delete(remaining,k);
+            break;
+          }
+        }
+      }
+      sizepreviousorbits=size(vInvA);
+    }
+    Ind[size(Ind)+1] = permutationFromIntvec(vInvA);
+    kill vInvA;
+  }
+  return(Ind);
+}
+
+static proc bigintToBinary(bigint n, int r)
+"
+USAGE: bigintToBinary(n, r): n bigint, r int.
+ASSUME: n is smaller then 2^r.
+RETURN: an intvec, with entries the positions of 1 in the binary representation of n with r bits.
+EXAMPLE: example bigintToBinary; shows an example
+"
+{
+  int k = r-1;
+
+  intvec v;
+  bigint n0 = n;
+
+  while(n0 > 0){
+    bigint tmp = bigint(2)^k;
+
+    while(tmp > n0){
+      k--;
+      tmp = bigint(2)^k;
+    }
+
+    v = k+1,v;
+    n0 = n0 - tmp;
+    k--;
+
+    kill tmp;
+  }
+
+  v = v[1..size(v)-1];
+  return(v);
+}
+
+static proc insertToList(list L, def elementToInsert, int posToInsert){
+  if(posToInsert == 1){
+    return(list(elementToInsert)+L);
+  }
+  if(posToInsert == size(L)+1){
+    return(L+list(elementToInsert));
+  }
+  return(list(L[1..(posToInsert-1)],elementToInsert,L[posToInsert..size(L)]));
+}
+
+proc computeOrbit(intvec v, list G)
+"USAGE: computeOrbit(v, G); v intvec, G list of permutations
+PURPOSE: Computes the orbit of v under the group action G.
+RETURN: list of intvecs contained in the orbit
+"
+{
+  int n = size(G[1].image);
+  list biOrbit;
+  list orbit;
+  bigint biGv;
+  int found;
+  int i,j;
+  for (i = 1; i <= size(G); i++)
+  {
+    biGv = binaryToBigint(composeIntvecs(G[i].image,v));
+    found = 0;
+    for (j = 1; j <= size(biOrbit); j++)
+    {
+      if (biOrbit[j] == biGv)
+      {
+        found = 1;
+        break;
+      }
+    }
+    if (!found)
+    {
+      orbit[size(orbit) + 1] = bigintToBinary(biGv, n);
+      biOrbit[size(biOrbit) + 1] = biGv;
+    }
+  }
+  return(orbit);
+}
+
+proc computeOrbitConeOrbitWithDuplicates(cone rep, list Asigma)
+"USAGE: computeOrbitConeOrbitWithDuplicates(v, Asigma); rep cone, Asigma list of matrices
+PURPOSE: Computes the orbit of rep under the group action given by Asigma.
+RETURN: list of cones contained in the orbit. Duplicates are not eliminated.
+"
+{
+  list orbit;
+  cone invAc;
+  int i;
+  for (i = 1; i <= size(Asigma); i++)
+  {
+    invAc = preimageCone(rep,Asigma[i]);
+    orbit[i] = invAc;
+  }
+  return(orbit);
+}
+
+proc findOrbitRepresentatives(list G, int #)
+"USAGE: findOrbits(G [,d]); G list of permutations in a subgroup of the symmetric group; d int minimum cardinality of simplices to be considered; if d is not specified it is considered to be 1
+PURPOSE: Computes representatives of the orbits of the action of G
+RETURN: list of intvec.
+"
+{
+  // Rewritten by Christian Reinbold.
+  int minimumCardinality = 1;
+  if (size(#)>0) { minimumCardinality=#; }
+
+  int n = size(G[1].image);
+  if (n >= 31)
+  {
+    ERROR("findOrbits() overflows for n >= 31");
+  }
+  int i;
+  list representatives;
+  intvec unhandled;
+  intvec current;
+  intvec finished = 0:(2^n - 1); // Place 2^n-1 zeroes (=false) in finished
+  bigint biUnhandled;
+  bigint biCurrent;
+
+  while(1)
+  {
+    for ( biUnhandled = 1
+        ; biUnhandled <= size(finished)
+        ; biUnhandled = biUnhandled + 1
+        )
+    {
+      if (!finished[int(biUnhandled)]) { break; }
+    }
+    if (biUnhandled > size(finished)) { break; }
+    unhandled = bigintToBinary(biUnhandled, n);
+    if (size(unhandled) < minimumCardinality)
+    {
+      finished[int(biUnhandled)] = 1; // set to true
+      continue;
+    }
+
+    representatives[size(representatives) + 1] = unhandled;
+    for (i = 1; i <= size(G); i++)
+    {
+      current = composeIntvecs(G[i].image, unhandled);
+      biCurrent = binaryToBigint(current);
+      if (!finished[int(biCurrent)])
+      {
+        finished[int(biCurrent)] = 1; // set to true
+      }
+    }
+  }
+  return(representatives);
+}
+
+
+////////////////////////////////////////////////////////////
+// Methods for computeFullDimAFaces/OrbitCones            //
+////////////////////////////////////////////////////////////
+
+proc computeFullDimAFaces(ideal I, intmat Q, list simplexFaces)
+{
+  int k = nrows(Q);
+  list result;
+  
+  for (int i = 1; i <= size(simplexFaces); i++)
+  {
+    intvec simplexFace = simplexFaces[i];
+    intmat projectedQ[k][size(simplexFace)] = Q[intvec(1..k),simplexFace];
+
+    if (rank(projectedQ) == k)
+    {
+      if (isAFace(I, simplexFace))
+      {
+        result[size(result)+1]=simplexFace;
+      }
+    }
+    
+    kill simplexFace, projectedQ;
+  }
+  return(result);
+}
+
+proc computeOrbitConeForAFace(intmat Q, intvec simplexFace)
+{
+  int k = nrows(Q);
+  intmat projectedQ[k][size(simplexFace)] = Q[intvec(1..k),simplexFace];
+  cone c = coneViaPoints(transpose(projectedQ));
+  c = canonicalizeCone(c);
+  return(c);
+}
+
+proc computeFullDimOrbitCones(ideal I, intmat Q, list simplexFaces)
+{
+  int k = nrows(Q);
+  list result;
+  
+  for (int i = 1; i <= size(simplexFaces); i++)
+  {
+    intvec simplexFace = simplexFaces[i];
+    intmat projectedQ[k][size(simplexFace)] = Q[intvec(1..k),simplexFace];
+
+    if (rank(projectedQ) == k) 
+    {
+      if (isAFace(I, simplexFace))
+      {
+        result[size(result)+1] = coneViaPoints(transpose(projectedQ));
+      }
+    }
+    kill simplexFace, projectedQ;
+  }
+  return(result);
+}
+
+static proc isAFace(ideal I, intvec face)
+{
+  string ringExpr = "ring restrictedRing = (" 
+                  + charstr(basering) 
+                  + "),(";
+  intvec weightVector = ringlist(basering)[3][1][2];
+  intvec newWeightVector;
+  for (int i=1; i<size(face); i++)
+  {
+    ringExpr = ringExpr + string(var(face[i])) + ",";
+    newWeightVector[i] = weightVector[face[i]];
+  }
+  newWeightVector[size(face)] = weightVector[face[size(face)]];
+  ringExpr = ringExpr 
+           + string(var(face[size(face)])) 
+           + "),wp(newWeightVector);";
+  def originalRing = basering;
+  execute(ringExpr);
+
+  ideal reducedI = imap(originalRing,I);
+  ideal saturatedI = saturateRespAllVars(reducedI);
+
+  return (saturatedI <> 1);
+}
+
+static proc saturateRespAllVars(ideal I)
+{
+  for (int varIndex = 1; varIndex <= nvars(basering); varIndex++)
+  {
+    if ((I==1) || (I==-1)) { break; }
+    I = saturateRespOneVar(I, varIndex);
+  }
+  return(I);
+}
+
+static proc saturateRespOneVar(ideal I, int varIndex)
+{
+  // Modify given wp-order such that var(varIndex) is the
+  // smallest element in the tie-breaker order.
+  string ringExpr = "ring resortedRing = ("
+                  + charstr(basering)
+                  + "),(";
+  intvec weightVector = ringlist(basering)[3][1][2];
+  intvec newWeightVector;
+  int vecIndex = 1;
+  int n = nvars(basering);
+  for (int i=1; i<=n; i++)
+  {
+    if (i <> varIndex)
+    {
+      ringExpr = ringExpr + string(var(i)) + ",";
+      newWeightVector[vecIndex] = weightVector[i];
+      vecIndex++;
+    }
+  }
+  newWeightVector[n] = weightVector[varIndex];
+  ringExpr = ringExpr 
+           + string(var(varIndex)) 
+           + "),wp(newWeightVector);";
+  def originalRing = basering;
+  execute(ringExpr);
+
+  // Compute I:<x>^\infty with a modified buchberger's algorithm
+  ideal I = satstd(imap(originalRing, I));
+  I = simplify(I,2+4+32);
+
+  setring originalRing;
+  return (imap(resortedRing,I));
+}
+
+////////////////////////////////////////////////////////////
+// Methods for computeInitialConeHash                     //
+////////////////////////////////////////////////////////////
+
+static proc randConeEl(bigintmat Q, int bound){
+  bigintmat w[1][ncols(Q)];
+
+  for(int i = 1; i <= nrows(Q); i++)
+  {
+    bigintmat v[1][ncols(Q)] = Q[i,1..ncols(Q)];
+    w = w + random(1,bound) * v;
+    kill v;
+  }
+
+  return(w);
+}
+
+proc computeInitialConeHash(bigintmat Q, cone enclosingCone, list orbitCones)
+{
+  int k = ambientDimension(enclosingCone);
+  bigintmat v;
+  cone c;
+  intvec hash;
+  bigintmat Qt = transpose(Q);
+  while (dimension(c) <> k)
+  {
+    // randomPoint is too slow for large enclosingCones defined by inequalities
+    // v = randomPoint(enclosingCone);
+    v = randConeEl(Qt,100);
+    if (containsRelatively(enclosingCone,v)) 
+    {
+      c,hash = GITcone(orbitCones,v);
+    }
+  }
+  return(hash);
+}
+
+static proc GITcone(list OCcones, bigintmat w)
+{
+  list OCrelcones;
+  intvec Hash;
+  for(int i = 1; i <= size(OCcones); i++){
+    if(containsInSupport(OCcones[i], w)){
+      OCrelcones[size(OCrelcones)+1]=OCcones[i];
+      Hash[size(Hash)+1] = i;
+    }
+  }
+  if (size(Hash) > 1)
+  {
+    Hash = intvec(Hash[2..size(Hash)]);
+  }
+  return(convexIntersection(OCrelcones),Hash);
+}
+
+////////////////////////////////////////////////////////////
+// Methods for computeNeighbourHashes                     //
+////////////////////////////////////////////////////////////
+
+proc computeNeighbourHashes(intvec hash, list orbitCones, cone enclosingCone)
+{
+  cone lambda = gitConeFromHash(orbitCones,hash);
+  list FL = listOfFacetsAndInteriorVectors(lambda, enclosingCone);
+  
+  bigintmat v,w;
+  intvec neighbourHash;
+  list neighbourHashes;
+  for (int i=size(FL[1]); i>0; i--)
+  {
+    v = FL[1][i][1]; // interior facet normal
+    w = FL[1][i][2]; // interior facet point
+    neighbourHash = getNeighborHash(orbitCones,w,v,1024);
+    neighbourHashes[i] = neighbourHash;
+  }
+
+  return (neighbourHashes);
+}
+
+static proc gitConeFromHash(list OC, intvec Hash)
+{
+  list OCtoIntersect = OC[Hash];
+  return (convexIntersection(OCtoIntersect));
+}
+
+static proc getNeighborHash(list OC, bigintmat w, bigintmat v, int mu)
+{
+  int success = 0;
+  int zz;
+  intvec Jtmp;
+  bigintmat wtmp;
+
+  while(!success)
+  {
+    mu = mu*2;
+    wtmp = mu*w - v;
+    success = 1;
+    for(zz = 1; zz <= size(OC); zz++)
+    {
+      if(containsInSupport(OC[zz], wtmp))
+      {
+        if(!containsInSupport(OC[zz], w))
+        {
+          success = 0;
+          Jtmp = 0;
+          break;
+        }
+        // insert index zz:
+        if(size(Jtmp) ==1 && Jtmp[1] == 0)
+        {
+          Jtmp[1] = zz;
+        }
+        else
+        {
+          Jtmp[size(Jtmp)+1] = zz;
+        }
+      }
+    }
+  }
+
+  return(Jtmp);
+}
+
+static proc listOfFacetsAndInteriorVectors(cone lambda, cone Qgamma){
+  list FL;
+  int numboundary;
+
+  bigintmat FL0 = facets(lambda);
+  bigintmat H[1][ncols(FL0)];
+  // delete row of H from FL0
+  bigintmat FL1[nrows(FL0)-1][ncols(FL0)]; 
+  bigintmat w;
+  cone facetCone;
+  for(int i = 1; i <= nrows(FL0); i++){
+    H = FL0[i,1..ncols(FL0)];
+
+    if(i > 1 and i < nrows(FL0))
+    {
+      FL1 = FL0[1..i-1, 1..ncols(FL0)], FL0[i+1..nrows(FL0), 1..ncols(FL0)];
+    }
+    if(i > 1 and i == nrows(FL0))
+    {
+      FL1 = FL0[1..i-1, 1..ncols(FL0)];
+    }
+    if(i == 1 and i < nrows(FL0))
+    {
+      FL1 = FL0[2..nrows(FL0), 1..ncols(FL0)];
+    }
+
+    facetCone = coneViaInequalities(FL1, H);
+
+    w = relativeInteriorPoint(facetCone);
+    if(containsRelatively(Qgamma,w)){
+      FL[size(FL) + 1] = list(H,w);
+    } else {
+      numboundary=numboundary+1;
+    }
+  }
+
+  return(list(FL,numboundary));
+}
+
+////////////////////////////////////////////////////////////
+// Methods for computing the moving cone                  //
+////////////////////////////////////////////////////////////
+
+static proc listToIntvec(list L)
+{
+  intvec v;
+  for (int i = 1;i<=size(L);i++)
+  {
+    v[i]=L[i];
+  }
+  return(v);
+}
+
+static proc intvecToList(intvec L)
+{
+  list v;
+  for (int i = 1;i<=size(L);i++)
+  {
+    v[i]=L[i];
+  }
+  return(v);
+}
+
+proc movingCone(intmat Q)
+"USAGE: movingCone(Q); Q: intmat
+PURPOSE: Computes the moving cone from the grading matrix, with the degrees in the columns of Q.
+RETURN: a cone
+EXAMPLE: example movingCone; shows an example
+"
+{
+  cone Qgammadual = coneViaInequalities(transpose(Q));
+  bigintmat R = facets(Qgammadual);
+  list idx1=intvecToList(intvec(1..nrows(R)));
+  intvec idx2=1..ncols(R);
+  intvec idx1iv;
+  bigintmat Ri[nrows(R)-1][ncols(R)];
+  list C;
+  for (int i = 1; i<=nrows(R);i++){
+    idx1iv = listToIntvec(delete(idx1,i));
+    Ri=R[idx1iv,idx2];
+    C[i]=coneViaPoints(Ri);
+  }
+  cone mov = convexIntersection(C);
+  return(mov);
+}
+
+proc intersectOrbitConesWithMovingCone(list OC,cone mov)
+{
+  list OCmov;
+  cone ocmov;
+  list keptIndices;
+  int fulldim=dimension(mov);
+  
+  for (int i=1; i<=size(OC); i++)
+  {
+    ocmov = convexIntersection(OC[i],mov);
+    ocmov = canonicalizeCone(ocmov);
+    if (dimension(ocmov) == fulldim)
+    {
+      OCmov[size(OCmov)+1] = ocmov;
+      keptIndices[size(keptIndices) + 1] = i;
+    }
+  }
+  return(OCmov,keptIndices);
+}
+

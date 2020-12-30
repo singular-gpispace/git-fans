@@ -1,0 +1,174 @@
+<defun name="full_dim_afaces">
+
+  <include-structs href="types.xpnet"/>
+
+  <tunnel name="in_data" type="problem_data" place="in_data"/>
+  <tunnel name="in_config" type="config" place="in_config"/>
+  <tunnel name="out_full_dim_afaces" type="list" place="out_full_dim_afaces"/>
+
+  <in name="enabled" type="control" place="enabled"/>
+  <out name="finished" type="control" place="finished"/>
+
+  <net>
+    <place name="in_data" type="problem_data" virtual="true"/>
+    <place name="in_config" type="config" virtual="true"/>
+    <place name="out_full_dim_afaces" type="list" virtual="true"/>
+
+    <place name="enabled" type="control"/>
+    <place name="finished" type="control"/>
+
+    <place name="all_simplex_faces_created" type="bool"/>
+    <place name="number_of_unhandled_simplex_faces_sets" type="unsigned long"/>
+    <place name="last_simplex_faces" type="list_range"/>
+    <place name="simplex_faces" type="list_range"/>
+    <place name="some_full_dim_afaces" type="list"/>
+
+    <transition name="init">
+      <defun>
+        <in name="token" type="control"/>
+        <out name="list" type="list"/>
+        <out name="false" type="bool"/>
+        <out name="zero" type="unsigned long"/>
+        <out name="list_range" type="list_range"/>
+        <expression>
+          ${list} := List ();
+          ${false} := false;
+          ${zero} := 0UL;
+          ${list_range} := Struct [start := List(), length := 0UL];
+        </expression>
+      </defun>
+      <connect-in port="token" place="enabled"/>
+      <connect-out port="list" place="out_full_dim_afaces"/>
+      <connect-out port="false" place="all_simplex_faces_created"/>
+      <connect-out port="zero" place="number_of_unhandled_simplex_faces_sets"/>
+      <connect-out port="list_range" place="last_simplex_faces"/>
+    </transition>
+
+    <transition name="create_simplex_faces_set">
+      <defun>
+        <in name="data" type="problem_data"/>
+        <in name="config" type="config"/>
+        <inout name="last" type="list_range"/>
+        <inout name="finished" type="bool"/>
+        <inout name="inc" type="unsigned long"/>
+        <out name="simplex_faces" type="list_range"/>
+        <module name="gitfan"
+                function="simplex_faces create_simplex_faces
+                  (config, data, last, finished, inc)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "createSimplexFaces"
+              );
+            inc++;
+            if(data.simplex_orbit_representatives.valid)
+            {
+              return RESOLVE_INTERFACE_FUNCTION(createSimplexFacesFromFile)
+                (data,last,config.job_size,finished);
+            }
+            else
+            {
+              return RESOLVE_INTERFACE_FUNCTION(createSimplexFaces)
+                (data.r,data.k,last,config.job_size,finished);
+            }
+          ]]></code>
+        </module>
+      </defun>
+      <condition>
+        !${finished}
+      </condition>
+      <connect-read port="data" place="in_data"/>
+      <connect-read port="config" place="in_config"/>
+      <connect-inout port="last" place="last_simplex_faces"/>
+      <connect-inout port="finished" place="all_simplex_faces_created"/>
+      <connect-inout port="inc"
+                     place="number_of_unhandled_simplex_faces_sets"/>
+      <connect-out port="simplex_faces" place="simplex_faces"/>
+    </transition>
+
+    <transition name="compute_full_dim_afaces">
+      <defun>
+        <in name="config" type="config"/>
+        <in name="data" type="problem_data"/>
+        <in name="simplex_faces" type="list_range"/>
+        <out name="afaces" type="list"/>
+        <module name="gitfan"
+                function="afaces compute_full_dim_afaces
+                  (config, data, simplex_faces)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "computeFullDimAFacesFrom"
+              );
+            if(data.simplex_orbit_representatives.valid)
+            {
+              return RESOLVE_INTERFACE_FUNCTION(computeFullDimAFacesFromFile)
+                (data, simplex_faces);
+            }
+            else
+            {
+              return RESOLVE_INTERFACE_FUNCTION(computeFullDimAFacesFromRange)
+                (data, simplex_faces);
+            }
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="config" place="in_config"/>
+      <connect-read port="data" place="in_data"/>
+      <connect-in port="simplex_faces" place="simplex_faces"/>
+      <connect-out port="afaces" place="some_full_dim_afaces"/>
+    </transition>
+
+    <transition name="aggregate_full_dim_afaces">
+      <defun>
+        <inout name="list" type="list"/>
+        <in name="inserted_list" type="list"/>
+        <inout name="dec" type="unsigned long"/>
+        <expression>
+          ${list} := stack_join (${list},${inserted_list});
+          ${dec} := ${dec} - 1UL;
+        </expression>
+      </defun>
+      <connect-inout port="list" place="out_full_dim_afaces"/>
+      <connect-in port="inserted_list" place="some_full_dim_afaces"/>
+      <connect-inout port="dec"
+                     place="number_of_unhandled_simplex_faces_sets"/>
+    </transition>
+
+    <transition name="clean">
+      <defun>
+        <in name="all_simplex_faces_created" type="bool"/>
+        <in name="number_of_unhandled_simplex_faces_sets"
+            type="unsigned long"/>
+        <in name="last_simplex_faces" type="list_range"/>
+        <out name="token" type="control"/>
+        <expression>
+          ${token} := [];
+        </expression>
+      </defun>
+      <condition>
+        ${all_simplex_faces_created} :and:
+        ${number_of_unhandled_simplex_faces_sets} :eq: 0UL
+      </condition>
+      <connect-in port="all_simplex_faces_created"
+                  place="all_simplex_faces_created"/>
+      <connect-in port="number_of_unhandled_simplex_faces_sets"
+                  place="number_of_unhandled_simplex_faces_sets"/>
+      <connect-in port="last_simplex_faces"
+                  place="last_simplex_faces"/>
+      <connect-out port="token" place="finished"/>
+    </transition>
+  </net>
+</defun>

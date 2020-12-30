@@ -1,0 +1,51 @@
+<structs>
+  <struct name="problem_data">
+    <field name="ideal" type="file"/>
+    <field name="Q" type="file"/>
+    <field name="r" type="int"/>
+    <field name="k" type="int"/>
+    <field name="moving_cone" type="optional_file"/>
+    <field name="symmetry_group" type="optional_file"/>
+    <field name="symmetry_group_size" type="unsigned int"/>
+    <field name="simplex_orbit_representatives" type="optional_file"/>
+    <field name="precomputed_orbit_cones" type="optional_file"/>
+    <field name="precomputed_symmetry_group_on_hashes" type="optional_file"/>
+  </struct>
+
+  <struct name="config">
+    <field name="job_size" type="unsigned long"/>
+    <field name="max_job_queue" type="unsigned long"/>
+    <field name="working_directory" type="directory"/>
+    <field name="max_cones" type="long"/>
+    <field name="storage_options" type="string"/>
+    <field name="logging_options" type="string"/>
+  </struct>
+
+  <struct name="file">
+    <field name="path" type="string"/>
+  </struct>
+
+  <struct name="directory">
+    <field name="path" type="string"/>
+  </struct>
+
+  <struct name="optional_file">
+    <field name="valid" type="bool"/>
+    <field name="path" type="string"/>
+  </struct>
+
+  <struct name="optional_directory">
+    <field name="valid" type="bool"/>
+    <field name="path" type="string"/>
+  </struct>
+
+  <struct name="list_range">
+    <field name="start" type="list"/>
+    <field name="length" type="unsigned long"/>
+  </struct>
+
+  <struct name="range">
+    <field name="start" type="unsigned long"/>
+    <field name="length" type="unsigned long"/>
+  </struct>
+</structs>

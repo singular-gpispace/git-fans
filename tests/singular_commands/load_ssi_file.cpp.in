@@ -1,0 +1,48 @@
+#include <gtest/gtest.h>
+
+#include <util-gitfan/singular_commands.hpp>
+
+#include <pnetc/type/file/op.hpp>
+
+namespace singular {
+namespace testing
+{
+  TEST(SingularCommandsTest, canLoadSSIFile)
+  {
+    EXPECT_TRUE(init());
+
+    call_and_discard("\
+      ring R = 0,T(1..10),wp(1,1,1,1,1,1,1,1,1,1);\
+      ideal I =\
+        T(5)*T(10)-T(6)*T(9)+T(7)*T(8),\
+        T(1)*T(9)-T(2)*T(7)+T(4)*T(5),\
+        T(1)*T(8)-T(2)*T(6)+T(3)*T(5),\
+        T(1)*T(10)-T(3)*T(7)+T(4)*T(6),\
+        T(2)*T(10)-T(3)*T(9)+T(4)*T(8);\
+      ");
+    load_ssi_if_not_defined("L", std::string("@SINGULAR_TESTDATA_DIR@/m5_ideal"));
+    EXPECT_EQ("1", get_result("string(L) == string(I);"));
+    load_ssi_if_not_defined
+      ("L", std::string("@SINGULAR_TESTDATA_DIR@/m5_torus_action"));
+    EXPECT_EQ("1", get_result("string(L) == string(I);"));
+    load_ssi("L", std::string("@SINGULAR_TESTDATA_DIR@/m5_torus_action"));
+    EXPECT_EQ("0", get_result("string(L) == string(I);"));
+
+    gitfan::pnet_list lvl1;
+    gitfan::pnet_list lvl2;
+    gitfan::pnet_list lvl3;
+    lvl3.push_back(pnetc::type::file::to_value(
+      gitfan::pnet_file("@SINGULAR_TESTDATA_DIR@/sample_ssi_files/int_2")));
+    lvl3.push_back(std::string("@SINGULAR_TESTDATA_DIR@/sample_ssi_files/int_3"));
+    lvl2.push_back(lvl3);
+    lvl1.push_back(lvl2);
+    lvl1.push_back(std::string("@SINGULAR_TESTDATA_DIR@/sample_ssi_files/int_1"));
+    load_ssi_if_not_defined("li", lvl1);
+    EXPECT_EQ("2", get_result("size(li);"));
+    EXPECT_EQ("1", get_result("size(li[1]);"));
+    EXPECT_EQ("2", get_result("size(li[1][1]);"));
+    EXPECT_EQ("1", get_result("li[2];"));
+    EXPECT_EQ("2", get_result("li[1][1][1];"));
+    EXPECT_EQ("3", get_result("li[1][1][2];"));
+  }
+}}

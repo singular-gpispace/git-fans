@@ -1,0 +1,86 @@
+////////////////////////////////////////////////////////////////////
+version="(v1.0, 2020-12-30)";
+category="Algebraic Geometry";
+info="
+LIBRARY: load_git_cones.lib
+
+PURPOSE: Load git cones from orbit cone hashes.
+
+AUTHORS: Christian Reinbold
+
+OVERVIEW: Provides helper methods in order to load git cones from its corresponding hashes into singular.
+
+PROCEDURES:
+  hashesToGITCones(list, list); Computes the corresponding git cones from a list of hashes
+  computeOrbits(list, list); Computes the orbits for each hash in the input list and returns them in a single list
+  computeOrbit(intvec, list); Computes the orbit for a single hash
+";
+////////////////////////////////////////////////////////////////////
+LIB "gitfan.lib"
+
+proc hashesToGITCones(list hashes, list orbitCones)
+"USAGE: hashesToGITCones(list hashes, list orbitCones); hashes list of hashes, orbitCones list of orbit cones
+PURPOSE: Computes the corresponding git cones from a list of hashes and orbit cones. The git cones are intersections of orbit cones selected by the hash.
+RETURN: list of cones
+"
+{
+  list result;
+  for (int i = 1; i <= size(hashes); i++)
+  {
+    result[i] = convexIntersection(orbitCones[hashes[i]]);
+  }
+  return(result);
+}
+
+proc computeOrbits(list hashes, list G)
+"USAGE: computeOrbits(list hashes, G); hashes list of hashes, G list of permutations
+PURPOSE: Computes the orbit of each intvec under the group action G.
+RETURN: A list of hashes (intvecs) that are located in the orbits of the input hashes.
+"
+{
+  list result;
+  list orbit;
+  int i,j;
+  for (i = 1; i <= size(hashes); i++)
+  {
+    orbit = computeOrbit(hashes[i], G);
+    for (j = 1; j <= size(orbit); j++)
+    {
+      result[size(result) + 1] = orbit[j];
+    }
+  }
+  return(result);
+}
+
+proc computeOrbit(intvec v, list G)
+"USAGE: computeOrbit(v, G); v intvec, G list of permutations
+PURPOSE: Computes the orbit of v under the group action G.
+RETURN: list of intvecs contained in the orbit
+"
+{
+  int n = size(G[1].image);
+  list biOrbit;
+  list orbit;
+  bigint biGv;
+  int found;
+  int i,j;
+  for (i = 1; i <= size(G); i++)
+  {
+    biGv = binaryToBigint(composeIntvecs(G[i].image,v));
+    found = 0;
+    for (j = 1; j <= size(biOrbit); j++)
+    {
+      if (biOrbit[j] == biGv)
+      {
+        found = 1;
+        break;
+      }
+    }
+    if (!found)
+    {
+      orbit[size(orbit) + 1] = bigintToBinary(biGv, n);
+      biOrbit[size(biOrbit) + 1] = biGv;
+    }
+  }
+  return(orbit);
+}

@@ -1,0 +1,256 @@
+<defun name="traverse_gitfan">
+
+  <include-structs href="types.xpnet"/>
+
+  <tunnel name="in_data" type="problem_data" place="in_data"/>
+  <tunnel name="in_config" type="config" place="in_config"/>
+  <tunnel name="in_orbit_cones" type="list" place="in_orbit_cones"/>
+  <tunnel name="in_symmetry_group" type="file" place="in_symmetry_group"/>
+  <tunnel name="out_number_of_cones" type="unsigned long"
+          place="out_number_of_cones"/>
+
+  <in name="enabled" type="control" place="enabled"/>
+  <out name="finished" type="control" place="finished"/>
+
+  <net>
+    <place name="in_data" type="problem_data" virtual="true"/>
+    <place name="in_config" type="config" virtual="true"/>
+    <place name="in_orbit_cones" type="list" virtual="true"/>
+    <place name="in_symmetry_group" type="file" virtual="true"/>
+    <place name="out_number_of_cones" type="unsigned long" virtual="true"/>
+
+    <place name="enabled" type="control"/>
+    <place name="finished" type="control"/>
+
+    <place name="enable_compute_initial_cone" type="control"/>
+
+    <place name="cones_to_be_expanded" type="list"/>
+    <place name="number_of_insertions" type="unsigned long"/>
+    <place name="expandable_cones_available" type="bool"/>
+    <place name="number_of_unprocessed_tokens" type="unsigned long"/>
+    <place name="number_of_fetched_expandable_cones" type="unsigned long"/>
+
+    <transition name="init">
+      <defun>
+        <in name="in_token" type="control"/>
+        <in name="orbit_cones" type="list"/>
+        <out name="out_token" type="control"/>
+        <out name="false" type="bool"/>
+        <out name="zero1" type="unsigned long"/>
+        <out name="zero2" type="unsigned long"/>
+        <out name="one" type="unsigned long"/>
+        <expression>
+          ${out_token} := [];
+          ${false} := false;
+          ${zero1} := 0UL;
+          ${zero2} := 0UL;
+          ${one} := 1UL;
+        </expression>
+      </defun>
+      <connect-in port="in_token" place="enabled"/>
+      <connect-read port="orbit_cones" place="in_orbit_cones"/>
+      <connect-out port="out_token" place="enable_compute_initial_cone"/>
+      <connect-out port="false" place="expandable_cones_available"/>
+      <connect-out port="zero1" place="out_number_of_cones"/>
+      <connect-out port="zero2" place="number_of_fetched_expandable_cones"/>
+      <connect-out port="one" place="number_of_unprocessed_tokens"/>
+    </transition>
+
+    <transition name="compute_initial_cone">
+      <defun>
+        <require key="worker" mandatory="true"/>
+        <in name="enabled" type="control"/>
+        <in name="config" type="config"/>
+        <in name="data" type="problem_data"/>
+        <in name="orbit_cones" type="list"/>
+        <in name="symmetry_group" type="file"/>
+        <out name="number_of_insertions" type="unsigned long"/>
+        <module name="gitfan"
+                function="number_of_insertions compute_initial_cone
+                  (config, data, orbit_cones, symmetry_group)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "computeInitialConeAndInsertNeighbours"
+              );
+            using list_type = std::list<pnet::type::value::value_type>;
+            using set_type = std::set<pnet::type::value::value_type>;
+            using list_of_sets_type = std::list<set_type>;
+            const boost::optional<list_type> initialCone =
+              RESOLVE_INTERFACE_FUNCTION(computeInitialCone)
+                (data, orbit_cones, symmetry_group);
+            return RESOLVE_INTERFACE_FUNCTION(insertNeighbours)
+              ( config.storage_options
+              , orbit_cones.size()
+              , (initialCone) ? list_of_sets_type{set_type{*initialCone}} : list_of_sets_type{}
+              , (initialCone) ? list_type{list_type{}} : list_type{}
+              );
+          ]]></code>
+        </module>
+      </defun>
+      <connect-in port="enabled" place="enable_compute_initial_cone"/>
+      <connect-read port="config" place="in_config"/>
+      <connect-read port="data" place="in_data"/>
+      <connect-read port="orbit_cones" place="in_orbit_cones"/>
+      <connect-read port="symmetry_group" place="in_symmetry_group"/>
+      <connect-out port="number_of_insertions" place="number_of_insertions"/>
+    </transition>
+
+    <transition name="get_expandable_cones">
+      <defun>
+        <require key="get_expandable_cones" mandatory="true"/>
+        <in name="config" type="config"/>
+        <inout name="enabled" type="bool"/>
+        <inout name="inc" type="unsigned long"/>
+        <inout name="fetched_amount" type="unsigned long"/>
+        <out name="cones" type="list"/>
+        <module name="gitfan"
+                function="enabled get_expandable_cones
+                  (config, cones, inc, fetched_amount)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <cinclude href="algorithm"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "getExpandableCones"
+              );
+            unsigned long size = config.job_size;
+            if (config.max_cones >= 0)
+            {
+              size = std::min(config.job_size,
+                              config.max_cones - fetched_amount);
+            }
+            cones = RESOLVE_INTERFACE_FUNCTION(getExpandableCones)
+              (config.storage_options, size);
+            inc++;
+            fetched_amount += cones.size();
+            return !cones.empty();
+          ]]></code>
+        </module>
+      </defun>
+      <condition>
+        ${enabled} :and:
+        ((${inc} :lt: ${config.max_job_queue}) :or:
+         (${config.max_job_queue} :eq: 0UL))
+      </condition>
+      <connect-read port="config" place="in_config"/>
+      <connect-inout port="enabled" place="expandable_cones_available"/>
+      <connect-inout port="inc" place="number_of_unprocessed_tokens"/>
+      <connect-inout port="fetched_amount"
+                     place="number_of_fetched_expandable_cones"/>
+      <connect-out port="cones" place="cones_to_be_expanded"/>
+    </transition>
+
+    <transition name="expand_cones_and_insert_neighbours">
+      <defun>
+        <require key="worker" mandatory="true"/>
+        <in name="config" type="config"/>
+        <in name="data" type="problem_data"/>
+        <in name="orbit_cones" type="list"/>
+        <in name="symmetry_group" type="file"/>
+        <in name="cones_to_expand" type="list"/>
+        <out name="number_of_insertions" type="unsigned long"/>
+        <module name="gitfan"
+                function="number_of_insertions expand_cones
+                  (config, data, orbit_cones, symmetry_group, cones_to_expand)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "expandConesAndInsertNeighbours"
+              );
+            const auto neighbours = RESOLVE_INTERFACE_FUNCTION(expandCones)
+              (data, orbit_cones, symmetry_group, cones_to_expand);
+            return RESOLVE_INTERFACE_FUNCTION(insertNeighbours)
+              (config.storage_options
+              , orbit_cones.size()
+              , neighbours
+              , cones_to_expand
+              );
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="config" place="in_config"/>
+      <connect-read port="data" place="in_data"/>
+      <connect-read port="orbit_cones" place="in_orbit_cones"/>
+      <connect-read port="symmetry_group" place="in_symmetry_group"/>
+      <connect-in port="cones_to_expand" place="cones_to_be_expanded"/>
+      <connect-out port="number_of_insertions" place="number_of_insertions"/>
+    </transition>
+
+    <transition name="sum_up_number_of_cones">
+      <defun>
+        <in name="summand" type="unsigned long"/>
+        <inout name="sum" type="unsigned long"/>
+        <inout name="continue" type="bool"/>
+        <inout name="dec" type="unsigned long"/>
+        <expression>
+          ${sum} := ${sum} + ${summand};
+          ${continue} := true;
+          ${dec} := ${dec} - 1UL;
+        </expression>
+      </defun>
+      <condition>
+        ${summand} :gt: 0UL
+      </condition>
+      <connect-in port="summand" place="number_of_insertions"/>
+      <connect-inout port="sum" place="out_number_of_cones"/>
+      <connect-inout port="continue" place="expandable_cones_available"/>
+      <connect-inout port="dec" place="number_of_unprocessed_tokens"/>
+    </transition>
+
+    <transition name="consume_zero">
+      <defun>
+        <in name="number" type="unsigned long"/>
+        <inout name="dec" type="unsigned long"/>
+        <expression>
+          ${dec} := ${dec} - 1UL;
+        </expression>
+      </defun>
+      <condition>
+        ${number} :le: 0UL
+      </condition>
+      <connect-in port="number" place="number_of_insertions"/>
+      <connect-inout port="dec" place="number_of_unprocessed_tokens"/>
+    </transition>
+
+    <transition name="clean">
+      <defun>
+        <in name="expandable_cones_available" type="bool"/>
+        <in name="number_of_unprocessed_tokens" type="unsigned long"/>
+        <in name="number_of_fetched_expandable_cones" type="unsigned long"/>
+        <out name="token" type="control"/>
+        <expression>
+          ${token} := [];
+        </expression>
+      </defun>
+      <condition>
+        !${expandable_cones_available} :and:
+        ${number_of_unprocessed_tokens} :eq: 0UL
+      </condition>
+      <connect-in port="expandable_cones_available"
+                  place="expandable_cones_available"/>
+      <connect-in port="number_of_unprocessed_tokens"
+                  place="number_of_unprocessed_tokens"/>
+      <connect-in port="number_of_fetched_expandable_cones"
+                  place="number_of_fetched_expandable_cones"/>
+      <connect-out port="token" place="finished"/>
+    </transition>
+  </net>
+</defun>

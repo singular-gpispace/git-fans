@@ -1,0 +1,42 @@
+#pragma once
+
+#include <util-generic/executable_path.hpp>
+
+#include <boost/filesystem/path.hpp>
+
+namespace config
+{
+  static boost::filesystem::path const installation("@CMAKE_INSTALL_PREFIX@");
+
+  inline boost::filesystem::path const& singularLibrary()
+  {
+    static boost::filesystem::path const library(
+      installation / "libexec" / "bundle" / "singular" / "lib" / "libSingular.so"
+    );
+    return library;
+  }
+
+  inline boost::filesystem::path const& gitfanInterfaceLibrary()
+  {
+    static boost::filesystem::path const library(
+      installation / "libexec" / "libUtil-Gitfan.so"
+    );
+    return library;
+  }
+
+  inline boost::filesystem::path const& gitfanInterpreterLibrary()
+  {
+    static boost::filesystem::path const library(
+      installation / "libexec" / "gitfanparallel.lib"
+    );
+    return library;
+  }
+
+  inline boost::filesystem::path const& loadGitConesLibrary()
+  {
+    static boost::filesystem::path const library(
+      installation / "libexec" / "load_git_cones.lib"
+    );
+    return library;
+  }
+}

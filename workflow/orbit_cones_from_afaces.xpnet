@@ -1,0 +1,164 @@
+<defun name="orbit_cones_from_afaces">
+
+  <include-structs href="types.xpnet"/>
+
+  <tunnel name="in_data" type="problem_data" place="in_data"/>
+  <tunnel name="in_config" type="config" place="in_config"/>
+  <tunnel name="inout_processed_list" type="list" place="inout_processed_list"/>
+  <tunnel name="out_symmetry_group_on_hashes" type="file"
+          place="out_symmetry_group_on_hashes"/>
+
+  <in name="enabled" type="control" place="enabled"/>
+  <out name="finished" type="control" place="finished"/>
+
+  <net>
+
+    <place name="in_data" type="problem_data" virtual="true"/>
+    <place name="in_config" type="config" virtual="true"/>
+    <place name="inout_processed_list" type="list" virtual="true"/>
+    <place name="out_symmetry_group_on_hashes" type="file" virtual="true"/>
+
+    <place name="enabled" type="control"/>
+    <place name="aface_reps_available" type="control"/>
+    <place name="orbit_cone_reps_available" type="control"/>
+    <place name="intersected_orbit_cone_reps_available" type="control"/>
+    <place name="orbit_cone_orbits_available" type="control"/>
+    <place name="unique_orbit_cone_orbits_available" type="control"/>
+    <place name="orbit_cones_available" type="control"/>
+    <place name="enable_clean" type="control"/>
+    <place name="finished" type="control"/>
+
+    <transition name="init">
+      <defun>
+        <in name="in_token" type="control"/>
+        <in name="data" type="problem_data"/>
+        <out name="out_token" type="control"/>
+        <expression>
+          ${out_token} := [];
+        </expression>
+      </defun>
+      <connect-in port="in_token" place="enabled"/>
+      <connect-read port="data" place="in_data"/>
+      <connect-out port="out_token" place="aface_reps_available"/>
+    </transition>
+
+    <transition name="compute_orbit_cones">
+      <include-function href="compute_orbit_cones.xpnet"/>
+      <place-map virtual="inout_list" real="inout_processed_list"/>
+      <place-map virtual="in_args" real="in_data"/>
+      <place-map virtual="in_config" real="in_config"/>
+      <connect-in port="enabled" place="aface_reps_available"/>
+      <connect-out port="finished" place="orbit_cone_reps_available"/>
+    </transition>
+
+    <transition name="intersect_with_moving_cone">
+      <include-function href="intersect_with_moving_cone.xpnet"/>
+      <place-map virtual="inout_list" real="inout_processed_list"/>
+      <place-map virtual="in_args" real="in_data"/>
+      <place-map virtual="in_config" real="in_config"/>
+      <connect-in port="enabled" place="orbit_cone_reps_available"/>
+      <connect-out port="finished"
+                   place="intersected_orbit_cone_reps_available"/>
+    </transition>
+
+    <transition name="expand_orbit_cone_orbits">
+      <include-function href="expand_orbit_cone_orbits.xpnet"/>
+      <place-map virtual="inout_list" real="inout_processed_list"/>
+      <place-map virtual="in_args" real="in_data"/>
+      <place-map virtual="in_config" real="in_config"/>
+      <connect-in port="enabled"
+                  place="intersected_orbit_cone_reps_available"/>
+      <connect-out port="finished" place="orbit_cone_orbits_available"/>
+    </transition>
+
+    <transition name="keep_unique_orbit_cones">
+      <include-function href="keep_unique_orbit_cones.xpnet"/>
+      <place-map virtual="inout_list" real="inout_processed_list"/>
+      <place-map virtual="in_args" real="in_data"/>
+      <place-map virtual="in_config" real="in_config"/>
+      <connect-in port="enabled" place="orbit_cone_orbits_available"/>
+      <connect-out port="finished" place="unique_orbit_cone_orbits_available"/>
+    </transition>
+
+    <transition name="removeOrbitStructureAndCreateSymmetryGroupOnHashes">
+      <defun>
+        <in name="config" type="config"/>
+        <in name="data" type="problem_data"/>
+        <inout name="orbit_cone_orbits" type="list"/>
+        <out name="symmetry_group_on_hashes" type="file"/>
+        <in name="in_token" type="control"/>
+        <out name="out_token" type="control"/>
+        <module name="gitfan"
+                function="out_token
+                  removeOrbitStructureAndCreateSymmetryGroupOnHashes
+                    (config, data, orbit_cone_orbits, symmetry_group_on_hashes)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "removeOrbitStructureAndCreateSymmetryGroupOnHashesFile"
+              );
+            symmetry_group_on_hashes = RESOLVE_INTERFACE_FUNCTION
+              (removeOrbitStructureAndReturnSymmetryGroupOnHashesFile)
+                (data, config.working_directory, orbit_cone_orbits);
+            return we::type::literal::control();
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="config" place="in_config"/>
+      <connect-read port="data" place="in_data"/>
+      <connect-inout port="orbit_cone_orbits" place="inout_processed_list"/>
+      <connect-out port="symmetry_group_on_hashes"
+                   place="out_symmetry_group_on_hashes"/>
+      <connect-in port="in_token" place="unique_orbit_cone_orbits_available"/>
+      <connect-out port="out_token" place="orbit_cones_available"/>
+    </transition>
+
+    <transition name="split_control_path">
+      <defun>
+        <in name="in" type="control"/>
+        <out name="out1" type="control"/>
+        <out name="out2" type="control"/>
+        <expression>
+          ${out1} := [];
+          ${out2} := [];
+        </expression>
+      </defun>
+      <connect-in port="in" place="orbit_cones_available"/>
+      <connect-out port="out1" place="finished"/>
+      <connect-out port="out2" place="enable_clean"/>
+    </transition>
+
+    <transition name="clean">
+      <defun>
+        <in name="config" type="config"/>
+        <in name="in_token" type="control"/>
+        <module name="gitfan"
+                function="clean(config)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "removeIntermediateOrbitInfo"
+              );
+            RESOLVE_INTERFACE_FUNCTION(removeIntermediateOrbitInfo)
+              (config.working_directory);
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="config" place="in_config"/>
+      <connect-in port="in_token" place="enable_clean"/>
+    </transition>
+
+  </net>
+</defun>

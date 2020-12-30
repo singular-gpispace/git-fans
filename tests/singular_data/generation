@@ -1,0 +1,197 @@
+////////////////////////////////////////////////////////////////////////////////
+// This is the code piped into the singular interpreter                       //
+// thas has been used in order to create the test data for unit tests.        //
+// Singular version: "Development version 4.1.3 / Mar 2020"                   //
+//                   system("version") returns 4132                           //
+// This code has been piped into a clean singular environment by              //
+// <"generation";                                                             //
+//                                                                            //
+// Required folders:                                                          //
+// sample_cones, m5_orbit_cones, sample_ssi_files                             //
+////////////////////////////////////////////////////////////////////////////////
+
+LIB "gitfan.lib";
+LIB "generation.lib";
+
+def I = read("ssi:r m5_ideal");
+def Q = read("ssi:r m5_torus_action");
+def G = read("ssi:r m5_symmetry_group");
+def QCone = coneViaPoints(transpose(Q));
+
+write("ssi:w m5_ideal", I);
+write("ssi:w m5_torus_action", Q);
+write("ssi:w m5_symmetry_group", G);
+
+list G_cones = groupActionOnQImage(G,Q);
+
+write("ssi:w m5_moving_cone", movingCone(Q));
+
+// Write some sample cones
+
+intmat M[3][3] =
+ 1, 1, 1,
+ 1,-1, 1,
+-1,-1, 1;
+write("ssi:w sample_cones/bottom_right", canonicalizeCone(coneViaPoints(M)));
+M =
+ 1, 1, 1,
+-1, 1, 1,
+-1,-1, 1;
+write("ssi:w sample_cones/top_left", canonicalizeCone(coneViaPoints(M)));
+M =
+ 1, 1, 1,
+-1,-1, 1,
+-1, 1, 1;
+write("ssi:w sample_cones/top_left_dup", canonicalizeCone(coneViaPoints(M)));
+M =
+ 1, 1, 1,
+-1, 1, 1,
+ 1,-1, 1;
+write("ssi:w sample_cones/top_right", canonicalizeCone(coneViaPoints(M)));
+M =
+-1,-1, 1,
+-1, 1, 1,
+ 1,-1, 1;
+write("ssi:w sample_cones/bottom_left", canonicalizeCone(coneViaPoints(M)));
+M =
+ 0, 0, 1,
+ 1, 1, 1,
+-1, 1, 1;
+write("ssi:w sample_cones/intersect_top", canonicalizeCone(coneViaPoints(M)));
+intmat M[4][3] =
+-1, 1, 1,
+ 1, 1, 1,
+ 0, 0, 1,
+ 1, 0, 1;
+write("ssi:w sample_cones/cutoff_top_right", canonicalizeCone(coneViaPoints(M)));
+intmat M[3][3] =
+ 1, 1, 1,
+ 1, 0, 1,
+ 0, 0, 1;
+write("ssi:w sample_cones/cutoff_right", canonicalizeCone(coneViaPoints(M)));
+
+// Print intermediate results of the algorithm
+
+// Create m5_full_dim_aface_orbit_representatives
+list simplexOrbitRepresentatives = findOrbitRepresentatives(G, 5);
+list afaceOrbitRepresentatives=afaces(I,simplexOrbitRepresentatives);
+list fulldimAfaceOrbitRepresentatives=fullDimImages(afaceOrbitRepresentatives,Q);
+writeListToFile( "m5_full_dim_aface_orbit_representatives"
+               , fulldimAfaceOrbitRepresentatives
+               );
+
+// Compute orbit cones
+int i,j;
+list fulldimAfaceOrbits = computeAfaceOrbits(fulldimAfaceOrbitRepresentatives, G);
+list OCO = orbitConeOrbits(fulldimAfaceOrbits,Q); // Note that we do not check for duplicated orbit cones here. For the m5-example, this is okay (checked manually)
+list OC;
+for (i = 1; i <= size(OCO); i++)
+{
+  for (j = 1; j <= size(OCO[i]); j++)
+  {
+    OCO[i][j] = canonicalizeCone(OCO[i][j]);
+    OC[size(OC) + 1] = OCO[i][j];
+  }
+}
+
+// Creates the files located in the directory "m5_orbit_cones".
+string file;
+for (i = 1; i <= size(OCO); i++)
+{
+  for (j = 1; j <= size(OCO[i]); j++)
+  {
+    file = "oc_" + string(i)+ "_" + string(j);
+    write("ssi:w m5_orbit_cones/" + file, OCO[i][j]);
+    write("m5_orbit_cones/list", file);
+    write("m5_orbit_cones/orbit" + string(i), file);
+  }
+}
+
+// Create symmetry group for the individual orbits
+list OCAsOneOrbit;
+for (i = 1; i <= size(OCO); i++)
+{
+  OCAsOneOrbit[1] = OCO[i];
+  list action = groupActionOnHashes(G_cones, OCAsOneOrbit);
+  write("ssi:w m5_symmetry_group_on_hashes_orbit" + string(i), action);
+  kill action;
+}
+
+// Create the symmetry group on hashes for the orbit cone ordering above.
+OCAsOneOrbit[1] = OC;
+list G_hashes = groupActionOnHashes(G_cones, OCAsOneOrbit);
+write("ssi:w m5_symmetry_group_on_hashes", G_hashes);
+
+// Create trivial symmetry group on hashes
+list G_hashes_trivial;
+G_hashes_trivial[1] = permutationFromIntvec(intvec(1..size(OC)));
+write("ssi:w m5_trivial_symmetry_group_on_hashes", G_hashes_trivial);
+
+// The following section computes the neighbour lists which are hard-coded in
+// the test for the gitfan-interface.
+// (In order to obtain the full neighbour list for the three inputted cones, run
+//  this script with other values for "hash")
+bigintmat initialPoint = randomPoint(QCone);
+cone c;
+intvec hash;
+//c, hash = GITcone(OC, initialPoint);
+//Optionally, hard code the hash here
+hash = 1,2,11,12,13,15,16,18,19,22,25,26,27,28,29,30,31,32,33,36;
+c = convexIntersection(list(OC[hash]));
+list FL = listOfFacetsAndInteriorVectors(c, QCone);
+bigintmat v,w;
+intvec neighbourHash;
+list neighbourHashes;
+for (int i=size(FL[1]); i>0; i--)
+{
+  v = FL[1][i][1]; // interior facet normal
+  w = FL[1][i][2]; // interior facet point
+  neighbourHash = getNeighborHash(OC,w,v,1024);
+  neighbourHashes[i] = neighbourHash;
+}
+print("neighbourHashes of " + string(hash));
+printList(neighbourHashes); // Printing neighbourHashes yields the neighbour list for "hash"
+
+
+// Create "m5_git_cones"
+list gitConeHashes = GITfanFromOrbitCones(OC, Q, QCone);
+for (int i = 1; i <= size(gitConeHashes); i++)
+{
+  write("m5_git_cones", bigint2hexString(gitConeHashes[i], (size(OC) + 3) div 4));
+}
+
+// Create "m5_git_cone_orbit_representatives"
+list foundRepresentatives;
+for (i = 1; i <= size(gitConeHashes); i++)
+{
+  intvec rep = minimalRepresentative(bigintToBinary(gitConeHashes[i],size(OC)), G_hashes);
+  int found = 0;
+  for (j = 1; j <= size(foundRepresentatives); j++)
+  {
+    if (rep == foundRepresentatives[j])
+    {
+      found = 1;
+      break;
+    }
+  }
+  if (!found)
+  {
+    foundRepresentatives[size(foundRepresentatives) + 1] = rep;
+    write( "m5_git_cone_orbit_representatives"
+         , bigint2hexString(binaryToBigint(rep), (size(OC) + 3) div 4));
+  }
+  kill rep, found;
+}
+
+// Create "m5_full_dim_afaces"
+list AF= afaces(I,nrows(Q));
+AF=fullDimImages(AF,Q);
+writeListToFile("m5_full_dim_afaces", AF);
+
+// Create sample ssi files
+i = 1;
+write("ssi:w sample_ssi_files/int_1", i);
+i = 2;
+write("ssi:w sample_ssi_files/int_2", i);
+i = 3;
+write("ssi:w sample_ssi_files/int_3", i);

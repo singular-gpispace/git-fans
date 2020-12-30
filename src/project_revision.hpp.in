@@ -1,0 +1,8 @@
+#pragma once
+
+#include <string>
+
+namespace config
+{
+  static std::string const projectRevision("@PROJECT_REVISION@");
+}

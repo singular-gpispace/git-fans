@@ -1,0 +1,36 @@
+<defun name="gitfan">
+
+  <include-structs href="types.xpnet"/>
+
+  <in name="problem_data" type="problem_data" place="input_data"/>
+  <in name="config" type="config" place="config"/>
+  <in name="orbit_cones" type="list" place="orbit_cones"/>
+  <in name="symmetry_group" type="file" place="symmetry_group"/>
+  <out name="number_of_cones" type="unsigned long" place="number_of_cones"/>
+  <out name="finished" type="control" place="end"/>
+
+  <net>
+    <place name="input_data" type="problem_data"/>
+    <place name="config" type="config"/>
+    <place name="orbit_cones" type="list"/>
+    <place name="symmetry_group" type="file"/>
+    <place name="number_of_cones" type="unsigned long"/>
+
+    <place name="start" type="control">
+      <token><value>[]</value></token>
+    </place>
+    <place name="end" type="control"/>
+
+    <transition name="traverse_gitfan">
+      <include-function href="traverse_gitfan.xpnet"/>
+      <place-map virtual="in_data" real="input_data"/>
+      <place-map virtual="in_config" real="config"/>
+      <place-map virtual="in_orbit_cones" real="orbit_cones"/>
+      <place-map virtual="in_symmetry_group" real="symmetry_group"/>
+      <place-map virtual="out_number_of_cones" real="number_of_cones"/>
+      <connect-in port="enabled" place="start"/>
+      <connect-out port="finished" place="end"/>
+    </transition>
+
+  </net>
+</defun>

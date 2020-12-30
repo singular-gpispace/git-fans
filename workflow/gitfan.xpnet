@@ -1,0 +1,251 @@
+<defun name="gitfan">
+
+  <include-structs href="types.xpnet"/>
+
+  <in name="problem_data" type="problem_data" place="raw_input_data"/>
+  <in name="config" type="config" place="config"/>
+  <out name="number_of_cones" type="unsigned long" place="number_of_cones"/>
+  <out name="finished" type="control" place="end"/>
+
+  <net>
+    <place name="raw_input_data" type="problem_data"/>
+    <place name="input_data" type="problem_data"/>
+    <place name="config" type="config"/>
+
+    <place name="start" type="control">
+      <token><value>[]</value></token>
+    </place>
+    <place name="full_dim_afaces_start" type="control"/>
+    <place name="full_dim_afaces_available" type="control"/>
+    <place name="orbit_cones_available" type="control"/>
+    <place name="end" type="control"/>
+
+    <place name="traverse_gitfan_start" type="control"/>
+    <place name="traverse_gitfan_end" type="control"/>
+    <place name="output_orbit_cones_order_start" type="control"/>
+    <place name="output_orbit_cones_order_end" type="control"/>
+    <place name="output_git_cones_end" type="control"/>
+
+    <place name="afaces_or_orbit_cones" type="list"/>
+    <place name="symmetry_group_on_hashes" type="file"/>
+    <place name="number_of_cones" type="unsigned long"/>
+
+    <transition name="preprocess_input">
+      <defun>
+        <in name="config" type="config"/>
+        <in name="in_data" type="problem_data"/>
+        <out name="out_data" type="problem_data"/>
+        <module name="gitfan"
+                function="preprocess_input(config, in_data, out_data)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "preprocessProblemData"
+              );
+            out_data=in_data;
+            RESOLVE_INTERFACE_FUNCTION(preprocessProblemData)
+              (out_data, config.working_directory);
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="config" place="config"/>
+      <connect-in port="in_data" place="raw_input_data"/>
+      <connect-out port="out_data" place="input_data"/>
+    </transition>
+
+    <transition name="processPrecomputedData">
+      <defun>
+        <in name="config" type="config"/>
+        <in name="data" type="problem_data"/>
+        <in name="in_token" type="control"/>
+        <out name="out_token" type="control"/>
+        <out name="orbit_cones" type="list"/>
+        <out name="symmetry_group_on_hashes" type="file"/>
+        <module name="gitfan"
+                function="out_token processPrecomputedData
+                  (config, data, orbit_cones, symmetry_group_on_hashes)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "copyPrecomputedOrbitConesToWorkingDirectory"
+              );
+            using list_type = std::list<pnet::type::value::value_type>;
+            RESOLVE_INTERFACE_FUNCTION(processPrecomputedData)
+              ( data
+              , config.working_directory
+              , orbit_cones
+              , symmetry_group_on_hashes
+              );
+            return we::type::literal::control();
+          ]]></code>
+        </module>
+      </defun>
+      <condition>
+        ${data.precomputed_orbit_cones.valid}
+      </condition>
+      <connect-read port="config" place="config"/>
+      <connect-read port="data" place="input_data"/>
+      <connect-in port="in_token" place="start"/>
+      <connect-out port="out_token" place="orbit_cones_available"/>
+      <connect-out port="orbit_cones" place="afaces_or_orbit_cones"/>
+      <connect-out port="symmetry_group_on_hashes"
+                   place="symmetry_group_on_hashes"/>
+    </transition>
+
+    <transition name="check_precomputed_orbit_cones">
+      <defun>
+        <in name="data" type="problem_data"/>
+        <in name="in_token" type="control"/>
+        <out name="out_token" type="control"/>
+        <expression>
+          ${out_token} := [];
+        </expression>
+      </defun>
+      <condition>
+        !${data.precomputed_orbit_cones.valid}
+      </condition>
+      <connect-read port="data" place="input_data"/>
+      <connect-in port="in_token" place="start"/>
+      <connect-out port="out_token" place="full_dim_afaces_start"/>
+    </transition>
+
+    <transition name="full_dim_afaces">
+      <include-function href="full_dim_afaces.xpnet"/>
+      <place-map virtual="in_data" real="input_data"/>
+      <place-map virtual="in_config" real="config"/>
+      <place-map virtual="out_full_dim_afaces" real="afaces_or_orbit_cones"/>
+      <connect-in port="enabled" place="full_dim_afaces_start"/>
+      <connect-out port="finished" place="full_dim_afaces_available"/>
+    </transition>
+
+    <transition name="compute_orbit_cones">
+      <include-function href="orbit_cones_from_afaces.xpnet"/>
+      <place-map virtual="in_data" real="input_data"/>
+      <place-map virtual="in_config" real="config"/>
+      <place-map virtual="inout_processed_list" real="afaces_or_orbit_cones"/>
+      <place-map virtual="out_symmetry_group_on_hashes"
+                 real="symmetry_group_on_hashes"/>
+      <connect-in port="enabled" place="full_dim_afaces_available"/>
+      <connect-out port="finished" place="orbit_cones_available"/>
+    </transition>
+
+    <transition name="split_control_path">
+      <defun>
+        <in name="in" type="control"/>
+        <out name="out1" type="control"/>
+        <out name="out2" type="control"/>
+        <expression>
+          ${out1} := [];
+          ${out2} := [];
+        </expression>
+      </defun>
+      <connect-in port="in" place="orbit_cones_available"/>
+      <connect-out port="out1" place="traverse_gitfan_start"/>
+      <connect-out port="out2" place="output_orbit_cones_order_start"/>
+    </transition>
+
+    <transition name="output_orbit_cones_order">
+      <defun>
+        <require key="worker" mandatory="true"/>
+        <in name="config" type="config"/>
+        <in name="orbit_cones" type="list"/>
+        <in name="enabled" type="control"/>
+        <out name="finished" type="control"/>
+        <module name="gitfan"
+                function="finished output_orbit_cones_order
+                  (config, orbit_cones)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "outputOrbitConesOrder"
+              );
+            RESOLVE_INTERFACE_FUNCTION(outputOrbitConesOrder)
+              (config.working_directory, orbit_cones);
+            return we::type::literal::control();
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="config" place="config"/>
+      <connect-read port="orbit_cones" place="afaces_or_orbit_cones"/>
+      <connect-in port="enabled" place="output_orbit_cones_order_start"/>
+      <connect-out port="finished" place="output_orbit_cones_order_end"/>
+    </transition>
+
+    <transition name="traverse_gitfan">
+      <include-function href="traverse_gitfan.xpnet"/>
+      <place-map virtual="in_data" real="input_data"/>
+      <place-map virtual="in_config" real="config"/>
+      <place-map virtual="in_orbit_cones" real="afaces_or_orbit_cones"/>
+      <place-map virtual="in_symmetry_group" real="symmetry_group_on_hashes"/>
+      <place-map virtual="out_number_of_cones" real="number_of_cones"/>
+      <connect-in port="enabled" place="traverse_gitfan_start"/>
+      <connect-out port="finished" place="traverse_gitfan_end"/>
+    </transition>
+
+    <transition name="output_git_cones">
+      <defun>
+        <require key="worker" mandatory="true"/>
+        <in name="config" type="config"/>
+        <in name="orbit_cones" type="list"/>
+        <in name="enabled" type="control"/>
+        <out name="finished" type="control"/>
+        <module name="gitfan"
+                function="finished output_git_cones(config, orbit_cones)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="util-gitfan/gitfanInterface.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "outputGitCones"
+              );
+            RESOLVE_INTERFACE_FUNCTION(outputGitCones)
+              (config.working_directory, config.storage_options);
+            RESOLVE_INTERFACE_FUNCTION(outputLoadGitConesSingularFile)
+              (config.working_directory, orbit_cones);
+            return we::type::literal::control();
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="config" place="config"/>
+      <connect-read port="orbit_cones" place="afaces_or_orbit_cones"/>
+      <connect-in port="enabled" place="traverse_gitfan_end"/>
+      <connect-out port="finished" place="output_git_cones_end"/>
+    </transition>
+
+    <transition name="join_control_path">
+      <defun>
+        <in name="in1" type="control"/>
+        <in name="in2" type="control"/>
+        <out name="out" type="control"/>
+        <expression>
+          ${out} := [];
+        </expression>
+      </defun>
+      <connect-in port="in1" place="output_git_cones_end"/>
+      <connect-in port="in2" place="output_orbit_cones_order_end"/>
+      <connect-out port="out" place="end"/>
+    </transition>
+  </net>
+</defun>

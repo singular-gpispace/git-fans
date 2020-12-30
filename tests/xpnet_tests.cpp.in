@@ -1,0 +1,496 @@
+#include <gtest/gtest.h>
+
+#include <drts/client.hpp>
+#include <drts/drts.hpp>
+#include <drts/scoped_rifd.hpp>
+#include <installation.hpp>
+
+#include <fhg/util/boost/program_options/generic.hpp>
+
+#include <we/type/literal/control.hpp>
+
+#include <pnetc/type/file/op.hpp>
+#include <pnetc/type/problem_data/op.hpp>
+#include <pnetc/type/config/op.hpp>
+
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/asio.hpp>
+#include <boost/range/adaptor/transformed.hpp>
+
+#include <util-gitfan/type_aliases.hpp>
+#include <util-gitfan/paths.hpp>
+#include <util-gitfan/conversion.hpp>
+#include <util-gitfan/ostreamOverloads.hpp>
+#include <util-gitfan/singular_library_wrapper.hpp>
+#include <util-gitfan/gitfanInterface.hpp>
+
+#include <storage/service_provider.hpp>
+#include <storage/conestorage.hpp>
+
+#include <logging/logging_options.hpp>
+
+#include <util.hpp>
+#include <temporaryUniquePath.hpp>
+
+#include <util-generic/cxx14/make_unique.hpp>
+#include <util-generic/read_lines.hpp>
+
+#include <iostream>
+#include <set>
+#include <sstream>
+
+namespace gitfan {
+namespace testing
+{
+  namespace fs = boost::filesystem;
+  namespace po = boost::program_options;
+  namespace fhg_po = fhg::util::boost::program_options;
+
+  class PetriNetTests : public ::testing::Test
+  {
+    public:
+      static const fs::path dataPath;
+      po::variables_map vm;
+      const unsigned long worker_per_node;
+      const util::TemporaryUniquePath working_directory;
+      pnet_problem_data data;
+      pnet_config config;
+      std::unique_ptr<gspc::installation> gspc_installation;
+      std::unique_ptr<util::TemporaryUniquePath> nodefile;
+      std::unique_ptr<storage::ServiceProvider> storageServiceProvider;
+      fs::path workflowPath;
+
+      PetriNetTests()
+        : worker_per_node(4)
+        , working_directory(fs::current_path().string() + "/test-wdir")
+        , gspc_installation(fhg::util::cxx14::make_unique<gspc::installation>
+            (fs::path("@CMAKE_INSTALL_PREFIX@") / "@BUNDLE_GPISPACE@"))
+        , nodefile(fhg::util::cxx14::make_unique<util::TemporaryUniquePath>
+            ("test-nodefile"))
+        , storageServiceProvider(
+            fhg::util::cxx14::make_unique<storage::ServiceProvider>(
+              interface::initStorageOptions({}, working_directory)
+            )
+          )
+      {
+        data.ideal.path = (dataPath / "m5_ideal").string();
+        data.Q.path = (dataPath / "m5_torus_action").string();
+        data.moving_cone.valid = false;
+        data.moving_cone.path = (dataPath / "m5_moving_cone").string();
+        data.symmetry_group.valid = false;
+        data.symmetry_group.path = (dataPath / "m5_symmetry_group").string();
+        data.simplex_orbit_representatives.valid = false;
+        data.simplex_orbit_representatives.path =
+          (dataPath / "m5_simplex_orbit_representatives").string();
+        pnet_value precomputed_orbit_cones;
+        data.precomputed_orbit_cones.valid = false;
+        data.precomputed_orbit_cones.path =
+          (dataPath / "m5_orbit_cones" / "list").string();
+        data.precomputed_symmetry_group_on_hashes.valid = false;
+        data.precomputed_symmetry_group_on_hashes.path =
+          (dataPath / "m5_symmetry_group_on_hashes").string();
+
+        std::vector<std::string> log_args;
+        log_args.push_back("--logs");
+        log_args.push_back(working_directory.string() + "/logs");
+
+        config.job_size = 10ul;
+        config.working_directory.path = working_directory.string();
+        config.max_cones = -1l;
+        config.storage_options = storageServiceProvider->options().serialize();
+        config.logging_options = logging::LoggingOptions(log_args).serialize();
+
+        std::string hostname = boost::asio::ip::host_name();
+        fs::ofstream ofs(*nodefile);
+        ofs << boost::asio::ip::host_name();
+        ofs.close();
+
+        std::vector<std::string> params {
+          "--nodefile", nodefile->string(),
+          "--rif-strategy", "ssh"
+          };
+
+        vm = po::variables_map(fhg_po::options("gitfan")
+          . add (gspc::options::logging())
+          . add (gspc::options::scoped_rifd())
+          . store_and_notify (params)
+          );
+      }
+
+      void TearDown()
+      {
+        singular::gitfan::killGlobalSymbols_TESTING_ONLY();
+      }
+
+      void initWorkflow(const std::string& pnetFile)
+      {
+        workflowPath = fs::path("@CMAKE_BINARY_DIR@") / "workflow" / pnetFile;
+        setLibraryPath(fs::path("@CMAKE_BINARY_DIR@")
+          / "workflow" / ("gen_" + pnetFile) / "pnetc" / "op" );
+      }
+
+      std::multimap<std::string, pnet_value> runWorkflow
+        (const std::multimap<std::string, pnet_value>& values_on_ports)
+      {
+        std::ostringstream topology_description;
+        topology_description
+          << "worker:" << worker_per_node << " "
+          << "get_expandable_cones:1";
+
+        gspc::scoped_rifds const rifds { gspc::rifd::strategy (vm)
+                                 , gspc::rifd::hostnames (vm)
+                                 , gspc::rifd::port (vm)
+                                 , *gspc_installation
+                                 };
+        gspc::scoped_runtime_system drts(vm
+                                        , *gspc_installation
+                                        , topology_description.str()
+                                        , rifds.entry_points()
+                                        );
+
+        return gspc::client(drts).put_and_run
+          (gspc::workflow(workflowPath), values_on_ports);
+      }
+
+      void setLibraryPath(const fs::path& path)
+      {
+        gspc::set_application_search_path
+          ( const_cast<boost::program_options::variables_map&> (vm)
+          , path
+          );
+      }
+
+      void checkWorkflowResultForM5Output
+        ( const std::multimap<std::string, pnet_value>& results
+        , bool withSymmetry
+        )
+      {
+        util::expect_workflow_result
+          (results, "finished", we::type::literal::control());
+        util::expect_workflow_result
+          ( results
+          , "number_of_cones"
+          , withSymmetry ? 6ul: 76ul
+          );
+
+        // Compute the permutation between the actual and test-data ordering of
+        // orbit cones
+        const auto orbitCones = util::loadOrbitConeListFile
+          (Paths::orbitConeOrderFile(working_directory));
+        const auto testdataOrbitCones = util::loadOrbitConeListFile
+          (dataPath / "m5_orbit_cones" / "list");
+        const util::permutation permutation =
+          util::computePermutation
+            ( orbitCones
+            , testdataOrbitCones
+            , &util::ssiFilesExistWithIdenticalContent
+            );
+
+        unsigned int totalOrbitSizes = 0;
+        // Expand each git cone representative to its full orbit and transform
+        // according to the orbit cone ordering.
+        std::set<std::string> transformedHashStrings;
+        for ( const std::string& hashString
+            : fhg::util::read_lines(Paths::gitConesFile(working_directory))
+            )
+        {
+          pnet_list orbit =
+            singular::gitfan::computeOrbitOfGroupAction_TESTING_ONLY
+              ( conversion::hexStringToList(hashString)
+              , Paths::symmetryGroupOnHashesFile(working_directory)
+              );
+          totalOrbitSizes += orbit.size();
+          std::transform
+            ( orbit.begin()
+            , orbit.end()
+            , std::inserter( transformedHashStrings
+                           , transformedHashStrings.begin()
+                           )
+            , [&] (const pnet_value& val) -> std::string
+              {
+                pnet_list hash = as<pnet_list>(val);
+                util::applyPermutationToHash(permutation, hash);
+                return conversion::listToHexString(hash, hashString.size() * 4);
+              }
+            );
+        }
+        EXPECT_EQ(totalOrbitSizes, transformedHashStrings.size())
+          << "Duplicates detected.";
+        const std::vector<std::string> testdataHashStrings =
+          fhg::util::read_lines(dataPath / "m5_git_cones");
+        EXPECT_EQ(util::asSet(testdataHashStrings), transformedHashStrings);
+      }
+
+      void gitfanPnetOutputsM5Results(bool skip, bool withSymmetry)
+      {
+        data.symmetry_group.valid = withSymmetry;
+        data.simplex_orbit_representatives.valid = withSymmetry;
+        data.precomputed_orbit_cones.valid = skip;
+        data.precomputed_symmetry_group_on_hashes.valid = skip && withSymmetry;
+        std::multimap<std::string, pnet_value> values_on_ports
+          ( { {"problem_data", pnetc::type::problem_data::to_value(data)}
+            , {"config", pnetc::type::config::to_value(config)}
+            }
+          );
+        initWorkflow("gitfan.pnet");
+        const auto results = runWorkflow(values_on_ports);
+        checkWorkflowResultForM5Output(results, withSymmetry);
+      }
+
+      void orbitConesFromAFacesPnetOutputsM5Results(bool withSymmetry)
+      {
+        data.symmetry_group.valid = withSymmetry;
+        interface::preprocessProblemData(data, config.working_directory);
+        const pnet_list afaces = conversion::loadList_TESTING_ONLY
+          (dataPath / (withSymmetry ? "m5_full_dim_aface_orbit_representatives"
+                                    : "m5_full_dim_afaces")
+          );
+        std::multimap<std::string, pnet_value> values_on_ports
+          ( { {"problem_data", pnetc::type::problem_data::to_value(data)}
+            , {"config", pnetc::type::config::to_value(config)}
+            , {"processed_list", afaces}
+            }
+          );
+
+        initWorkflow("orbit_cones_from_afaces.pnet");
+        const auto results = runWorkflow(values_on_ports);
+        util::expect_workflow_result
+          (results, "finished", we::type::literal::control());
+
+        pnet_list actualOrbitCones;
+        util::read_workflow_result(results, "processed_list",
+                                   actualOrbitCones);
+        util::permutation permutation;
+        ASSERT_NO_THROW
+        (
+          permutation = util::computePermutation
+            ( util::toFilePaths(actualOrbitCones)
+            , util::loadOrbitConeListFile(dataPath / "m5_orbit_cones" / "list")
+            , &util::ssiFilesExistWithIdenticalContent
+            );
+        );
+
+        pnet::type::value::structured_type actualSymmetryGroupOnHashes;
+        util::read_workflow_result(results, "symmetry_group_on_hashes",
+                                   actualSymmetryGroupOnHashes);
+        fs::path actualSymmetryGroupOnHashesPath =
+          pnetc::type::file::from_value(actualSymmetryGroupOnHashes).path;
+        if (withSymmetry)
+        {
+          auto action =
+            singular::gitfan::readGroupAction(actualSymmetryGroupOnHashesPath);
+          util::applyPermutationToGroupAction(permutation, action);
+          const auto expectedAction = singular::gitfan::readGroupAction
+            (data.precomputed_symmetry_group_on_hashes.path);
+          EXPECT_EQ(expectedAction, action);
+        }
+        else
+        {
+          EXPECT_PRED2( &util::ssiFilesExistWithIdenticalContent
+                      , dataPath / "m5_trivial_symmetry_group_on_hashes"
+                      , actualSymmetryGroupOnHashesPath
+                      );
+        }
+      }
+
+      void traverseGitfanPnetOutputsM5Results(bool withSymmetry)
+      {
+        data.symmetry_group.valid = withSymmetry;
+        data.precomputed_orbit_cones.valid = true;
+        data.precomputed_symmetry_group_on_hashes.valid = withSymmetry;
+
+        pnet_list orbitCones;
+        pnet_file symmetryGroupFile;
+
+        interface::preprocessProblemData(data, config.working_directory);
+        interface::processPrecomputedData
+          (data, config.working_directory, orbitCones, symmetryGroupFile);
+
+        std::multimap<std::string, pnet_value> values_on_ports
+          ( { {"problem_data", pnetc::type::problem_data::to_value(data)}
+            , {"config", pnetc::type::config::to_value(config)}
+            , {"orbit_cones", orbitCones}
+            , {"symmetry_group", pnetc::type::file::to_value(symmetryGroupFile)}
+            }
+          );
+        initWorkflow("traverse_gitfan.pnet");
+        const auto results = runWorkflow(values_on_ports);
+
+        // Populate working directory for checkWorkflowResultForM5Output()
+        interface::outputOrbitConesOrder(config.working_directory, orbitCones);
+        std::unique_ptr<storage::IConeStorage> storage =
+          storage::IConeStorage::build(config.storage_options);
+        storage->saveConesPersistently(Paths::gitConesFile(working_directory));
+
+        checkWorkflowResultForM5Output(results, withSymmetry);
+      }
+  };
+
+  const fs::path PetriNetTests::dataPath("@SINGULAR_TESTDATA_DIR@");
+
+  TEST_F(PetriNetTests, gitfanPnetOutputsM5Results)
+  {
+    gitfanPnetOutputsM5Results(false, false);
+  }
+
+  TEST_F(PetriNetTests, gitfanPnetOutputsM5ResultsRespectingSymmetry)
+  {
+    gitfanPnetOutputsM5Results(false, true);
+  }
+
+  TEST_F(PetriNetTests, gitfanPnetCanSkipPhaseOneAndOutputM5Results)
+  {
+    gitfanPnetOutputsM5Results(true, false);
+  }
+
+  TEST_F(PetriNetTests,
+         gitfanPnetCanSkipPhaseOneAndOutputM5ResultsRespectingSymmetry)
+  {
+    gitfanPnetOutputsM5Results(true, true);
+  }
+
+  TEST_F(PetriNetTests,
+         gitfanPnetReturnsZeroConesWhenSkippingPhaseOneWithZeroOrbitCones)
+  {
+    util::TemporaryUniquePath emptyFile
+      (fs::current_path().string() + "/test-empty_file");
+    // touch file
+    fs::ofstream o(emptyFile);
+    o.close();
+    data.precomputed_orbit_cones.valid = true;
+    data.precomputed_orbit_cones.path = emptyFile.string();
+    std::multimap<std::string, pnet_value> values_on_ports
+      ( { {"problem_data", pnetc::type::problem_data::to_value(data)}
+        , {"config", pnetc::type::config::to_value(config)}
+        }
+      );
+    initWorkflow("gitfan.pnet");
+    const auto results = runWorkflow(values_on_ports);
+    util::expect_workflow_result
+          (results, "finished", we::type::literal::control());
+    util::expect_workflow_result(results, "number_of_cones", 0ul);
+  }
+
+  TEST_F(PetriNetTests, fullDimAFacesPnetOutputsM5Results)
+  {
+    interface::preprocessProblemData(data, config.working_directory);
+    std::multimap<std::string, pnet_value> values_on_ports
+      ( { {"problem_data", pnetc::type::problem_data::to_value(data)}
+        , {"config", pnetc::type::config::to_value(config)}
+        }
+      );
+    initWorkflow("full_dim_afaces.pnet");
+    const auto results = runWorkflow(values_on_ports);
+    util::expect_workflow_result
+      (results, "finished", we::type::literal::control());
+
+    pnet_list actualAFaces;
+    util::read_workflow_result(results, "full_dim_afaces", actualAFaces);
+    const pnet_list expectedAFaces = conversion::loadList_TESTING_ONLY
+      (dataPath / "m5_full_dim_afaces");
+
+    const std::set<pnet_value> actualAsSet
+      (actualAFaces.begin(), actualAFaces.end());
+    const std::set<pnet_value> expectedAsSet
+      (expectedAFaces.begin(), expectedAFaces.end());
+    EXPECT_EQ(expectedAsSet, actualAsSet);
+  }
+
+  TEST_F(PetriNetTests, fullDimAFacesPnetOutputsM5ResultsRespectingSymmetry)
+  {
+    data.symmetry_group.valid = true;
+    data.simplex_orbit_representatives.valid = true;
+    interface::preprocessProblemData(data, config.working_directory);
+    std::multimap<std::string, pnet_value> values_on_ports
+      ( { {"problem_data", pnetc::type::problem_data::to_value(data)}
+        , {"config", pnetc::type::config::to_value(config)}
+        }
+      );
+    initWorkflow("full_dim_afaces.pnet");
+    const auto results = runWorkflow(values_on_ports);
+    util::expect_workflow_result
+      (results, "finished", we::type::literal::control());
+
+    pnet_list actualAFaces;
+    pnet_list actualAFacesRepresentatives;
+    util::read_workflow_result(results, "full_dim_afaces",
+                               actualAFacesRepresentatives);
+    for ( const auto& aface : actualAFacesRepresentatives
+        | boost::adaptors::transformed(as<pnet_list>)
+        )
+    {
+      const pnet_list orbit =
+        singular::gitfan::computeOrbitOfGroupAction_TESTING_ONLY
+          (aface, dataPath / "m5_symmetry_group");
+      actualAFaces.insert(actualAFaces.end(), orbit.begin(), orbit.end());
+    }
+    pnet_set actualAFacesSet = util::asSet(actualAFaces);
+    EXPECT_EQ(actualAFacesSet.size(), actualAFaces.size())
+      << "duplicates after computing orbits from representatives";
+    EXPECT_EQ
+      ( util::asSet(conversion::loadList_TESTING_ONLY
+          (dataPath / "m5_full_dim_afaces"))
+      , actualAFacesSet
+    );
+  }
+
+  TEST_F(PetriNetTests, orbitConesFromAFacesPnetOutputsM5Results)
+  {
+    orbitConesFromAFacesPnetOutputsM5Results(false);
+  }
+
+  TEST_F(PetriNetTests,
+         orbitConesFromAFacesPnetOutputsM5ResultsRespectingSymmetry)
+  {
+    orbitConesFromAFacesPnetOutputsM5Results(true);
+  }
+
+  TEST_F(PetriNetTests, traverseGitfanPnetOutputsM5Results)
+  {
+    traverseGitfanPnetOutputsM5Results(false);
+  }
+
+  TEST_F(PetriNetTests, traverseGitfanPnetOutputsM5ResultsRespectingSymmetry)
+  {
+    traverseGitfanPnetOutputsM5Results(true);
+  }
+
+  TEST_F(PetriNetTests, listManipulation)
+  {
+    std::vector<pnet_list> inputLists
+      { pnet_list {-1, 4, -3, 4, 3}
+      , pnet_list {-1, 4, -3, 4, 3}
+      , pnet_list { }
+      };
+    std::vector<bool> inputArgs { false, true, false };
+    std::vector<pnet_list> expectedLists
+      { pnet_list {8, 8, 6}
+      , pnet_list {-1, 4, -3, 4, 3}
+      , pnet_list { }
+      };
+
+    initWorkflow("list_manipulation_example.pnet");
+    for (unsigned int i = 0; i < inputLists.size(); i++)
+    {
+      std::multimap<std::string, pnet_value> values_on_ports
+        ( { {"list", inputLists[i] }
+          , {"args", inputArgs[i]}
+          , {"config", pnetc::type::config::to_value(config)}
+          }
+        );
+      const auto results = runWorkflow(values_on_ports);
+
+      util::expect_workflow_result
+        (results, "finished", we::type::literal::control());
+
+      pnet_list outputList;
+      util::read_workflow_result(results, "list", outputList);
+      std::multiset<pnet_value> outputAsMultiset
+        (outputList.begin(), outputList.end());
+      std::multiset<pnet_value> expectedAsMultiset
+        (expectedLists[i].begin(), expectedLists[i].end());
+      EXPECT_EQ(expectedAsMultiset, outputAsMultiset);
+    }
+  }
+}}

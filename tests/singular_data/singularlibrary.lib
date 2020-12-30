@@ -1,0 +1,9 @@
+////////////////////////////////////////////////////////////
+version = "(v0.0)";
+category = "";
+info = "Provides a function for the SingularCommandsTest to load.";
+
+proc singularlibrary_return_string(string s)
+{
+  return(s);
+}

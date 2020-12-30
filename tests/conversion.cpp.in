@@ -1,0 +1,181 @@
+#include <gtest/gtest.h>
+
+#include <stdexcept>
+
+#include <util-gitfan/conversion.hpp>
+#include <util-gitfan/singular_commands.hpp>
+#include <util-generic/finally.hpp>
+#include <util-gitfan/ostreamOverloads.hpp>
+
+namespace gitfan {
+namespace conversion {
+namespace testing
+{
+
+  TEST(ConversionIntvecList, isBijective)
+  {
+    {
+      pnet_list list { 1,3,5,7 };
+      intvec* iv = createIntvec(list);
+      FHG_UTIL_FINALLY([=] { delete iv; });
+      EXPECT_EQ(list, toList(iv));
+    }
+    {
+      singular::init();
+      singular::call_and_discard("intvec iv = 1,3,5,7;");
+      FHG_UTIL_FINALLY([] { singular::kill("iv"); });
+      intvec* iv = createIntvec(toList(singular::getIntvec("iv")));
+      singular::put("ivimage", iv);
+      FHG_UTIL_FINALLY([] { singular::kill("ivimage"); });
+
+      EXPECT_EQ("1", singular::get_result("iv == ivimage;"));
+    }
+  }
+
+  TEST(ConversionSingular, createdIntvecsEqualInterpreterIntvecsInSingular)
+  {
+    singular::init();
+
+    pnet_list list { -51,7 };
+    std::vector<int> vector { -51,7 };
+    singular::put("list_iv", createIntvec(list));
+    FHG_UTIL_FINALLY([] { singular::kill("list_iv"); });
+    singular::put("vector_iv", createIntvec(vector));
+    FHG_UTIL_FINALLY([] { singular::kill("vector_iv"); });
+    singular::call_and_discard("intvec singular_iv = -51,7;");
+    FHG_UTIL_FINALLY([] { singular::kill("singular_iv"); });
+
+    EXPECT_EQ("1", singular::get_result("list_iv == singular_iv;"));
+    EXPECT_EQ("1", singular::get_result("vector_iv == list_iv;"));
+    EXPECT_EQ("1", singular::get_result("singular_iv == vector_iv;"));
+  }
+
+  TEST(ConversionSingular, nestedListCanBeExtractedFromSingular)
+  {
+    singular::init();
+
+    pnet_list lvl3_1 { 3, 4, 3 };
+    pnet_list lvl3_2 { 1, 2, 3 };
+    pnet_list lvl2_1 { lvl3_1, lvl3_2 };
+    pnet_list lvl2_2 { 1 };
+    pnet_list lvl1 { lvl2_1, lvl2_2 };
+    singular::call_and_discard("list lvl3_1 = 3,4,3;");
+    FHG_UTIL_FINALLY([] { singular::kill("lvl3_1"); });
+    singular::call_and_discard("intvec lvl3_2 = 1,2,3;");
+    FHG_UTIL_FINALLY([] { singular::kill("lvl3_2"); });
+    singular::call_and_discard("list lvl2_1 = lvl3_1,lvl3_2;");
+    FHG_UTIL_FINALLY([] { singular::kill("lvl2_1"); });
+    singular::call_and_discard("list lvl2_2 = 1;");
+    FHG_UTIL_FINALLY([] { singular::kill("lvl2_2"); });
+    singular::call_and_discard("list lvl1 = lvl2_1,lvl2_2;");
+    FHG_UTIL_FINALLY([] { singular::kill("lvl1"); });
+
+    const pnet_list extracted = toList(singular::getList("lvl1"));
+    EXPECT_EQ(lvl1, extracted);
+  }
+
+  TEST(ConversionSingular, nestedListConversionToAndFromSingularIsIdentity)
+  {
+    singular::init();
+    {
+      pnet_list lvl3_1 { 3, 4, 3 };
+      pnet_list lvl3_2 { 1, 2, 3 };
+      pnet_list lvl2_1 { lvl3_1, lvl3_2 };
+      pnet_list lvl2_2 { 1 };
+      pnet_list lvl1 { lvl2_1, lvl2_2 };
+      auto singularList = toSingularList(lvl1, true);
+      singular::put("l", singularList);
+      singular::call_and_discard("def copy = l;");
+      const pnet_list extracted = toList(singular::getList("copy"));
+      singular::kill("l", "copy");
+      EXPECT_EQ(lvl1, extracted);
+    }
+    {
+      pnet_list lvl3_1 { 3, 4, 3 };
+      pnet_list lvl3_2 { 1, 2, 3 };
+      pnet_list lvl2_1 { lvl3_1, lvl3_2 };
+      pnet_list lvl2_2 { 1 };
+      pnet_list lvl1 { lvl2_1, lvl2_2 };
+      auto singularList = toSingularList(lvl1, false);
+      singular::put("l", singularList);
+      singular::call_and_discard("def copy = l;");
+      const pnet_list extracted = toList(singular::getList("copy"));
+      singular::kill("l", "copy");
+      EXPECT_EQ(lvl1, extracted);
+    }
+  }
+
+  TEST(ConversionListHex, isBijective)
+  {
+    std::list<pnet_list> lists;
+    for (int i = 0; i < 1024; i++)
+    {
+      pnet_list list;
+      int j = i;
+      int pos = 1;
+      while ( j > 0)
+      {
+        div_t euclidean = div(j, 2);
+        if (euclidean.rem)
+        {
+          list.push_back(pos);
+        }
+        j = euclidean.quot;
+        pos++;
+      }
+      lists.push_back(list);
+    }
+
+    for (const auto& list : lists)
+    {
+      EXPECT_EQ(list, hexStringToList(listToHexString(list, 10)));
+    }
+
+    std::list<std::string> hexStrings {"6193ab", "ae29f0", "000000", "ffffff"
+      , "f2e90a", "bba100", "000001", "100000", "000003", "a8d9e5" };
+    for (const auto& hex : hexStrings)
+    {
+      EXPECT_EQ(hex, listToHexString(hexStringToList(hex), 4*6));
+    }
+  }
+
+  TEST(ConversionListHex, convertsSamplesCorrectly)
+  {
+    EXPECT_EQ("40000", listToHexString(pnet_list{19}, 19));
+    EXPECT_EQ("40000", listToHexString(pnet_list{19}, 20));
+    EXPECT_EQ("040000", listToHexString(pnet_list{19}, 21));
+    EXPECT_EQ("2e5", listToHexString(pnet_list{1,3,6,7,8,10}, 10));
+  }
+
+  TEST(ConversionListHex, throwIffMaximalValueConstraintViolated)
+  {
+    pnet_list list {1, 5, 19};
+    EXPECT_THROW(listToHexString(list, 18), std::invalid_argument);
+    EXPECT_NO_THROW(listToHexString(list, 19));
+  }
+
+  TEST(ConversionListHex, throwIffNoHexInput)
+  {
+    EXPECT_THROW(hexStringToList("A2G"), std::invalid_argument);
+    EXPECT_THROW(hexStringToList("0ä,"), std::invalid_argument);
+  }
+
+  TEST(ConversionListHex, isCaseInsensitive)
+  {
+    EXPECT_EQ(hexStringToList("A8F"), hexStringToList("a8f"));
+  }
+
+  TEST(Conversion, canLoadLists)
+  {
+    pnet_list expected {
+      pnet_list { 2, 1, 3 },
+      pnet_list { 4,5 },
+      pnet_list { },
+      pnet_list { 1 },
+      pnet_list { }};
+    const boost::filesystem::path listPath
+      ("@SINGULAR_TESTDATA_DIR@/sample_pnet_list");
+    EXPECT_EQ(expected, loadList_TESTING_ONLY(listPath));
+  }
+}}}
+

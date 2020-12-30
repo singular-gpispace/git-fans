@@ -1,0 +1,30 @@
+<defun name="gitfan">
+
+  <include-structs href="types.xpnet"/>
+
+  <inout name="list" type="list" place="list"/>
+  <in name="args" type="bool" place="args"/>
+  <in name="config" type="config" place="config"/>
+  <out name="finished" type="control" place="end"/>
+
+  <net>
+
+    <place name="list" type="list"/>
+    <place name="args" type="bool"/>
+    <place name="config" type="config"/>
+
+    <place name="start" type="control">
+      <token><value>[]</value></token>
+    </place>
+    <place name="end" type="control"/>
+
+    <transition name="manipulate_list">
+      <include-function href="list_manipulation_example.xpnet"/>
+      <place-map virtual="inout_list" real="list"/>
+      <place-map virtual="in_args" real="args"/>
+      <place-map virtual="in_config" real="config"/>
+      <connect-in port="enabled" place="start"/>
+      <connect-out port="finished" place="end"/>
+    </transition>
+  </net>
+</defun>

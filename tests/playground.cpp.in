@@ -1,0 +1,125 @@
+#include <util-generic/print_exception.hpp>
+
+#include <util-gitfan/type_aliases.hpp>
+#include <util-gitfan/gitfanInterface.hpp>
+#include <util-gitfan/singular_library_wrapper.hpp>
+
+#include <logging/logging.hpp>
+#include <logging/logging_options.hpp>
+#include <logging/scope_profiler.hpp>
+#include <logging/statistics/performance_dump_reader.hpp>
+#include <logging/statistics/counter_dump_reader.hpp>
+
+#include <boost/filesystem.hpp>
+
+#include <util.hpp>
+
+#include <iostream>
+
+using namespace gitfan;
+namespace fs = boost::filesystem;
+
+void run()
+{
+  fs::path dataPath("@CMAKE_SOURCE_DIR@");
+  dataPath /= "singular";
+  pnet_problem_data data;
+  data.ideal.path = (dataPath / "m6_ideal").string();
+  data.Q.path = (dataPath / "m6_torus_action").string();
+  data.r = 40;
+  data.k = 16;
+  data.moving_cone.valid = true;
+  data.moving_cone.path = (dataPath / "m6_moving_cone").string();
+  data.symmetry_group.valid = false;
+  data.simplex_orbit_representatives.valid = false;
+  data.precomputed_orbit_cones.valid = true;
+  data.precomputed_orbit_cones.path =
+    (dataPath / "m6_orbit_cones" / "list").string();
+  data.precomputed_symmetry_group_on_hashes.valid = true;
+  data.precomputed_symmetry_group_on_hashes.path =
+    (dataPath / "m6_symmetry_group_on_hashes").string();
+
+  const auto orbitCones = ::gitfan::testing::util::toPnetList(
+    ::gitfan::testing::util::loadOrbitConeListFile
+      (dataPath / "m6_orbit_cones" / "list"));
+
+  pnet_list cone
+    { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, 21, 22
+    , 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39
+    , 40, 41, 42, 43, 44, 45, 46, 50
+    };
+
+  const auto g =
+    singular::gitfan::readGroupAction("/u/r/reinbold/git-fan/src/tests/data/m5_symmetry_group_on_hashes");
+  singular::gitfan::writeGroupActionToSSIFile(g, "/u/r/reinbold/Desktop/test_output");
+}
+
+class DirectoryRAII
+{
+  public:
+    DirectoryRAII()
+      : log(fs::unique_path("test-logs_%%%%-%%%%-%%%%-%%%%"))
+    { }
+
+    ~DirectoryRAII()
+    {
+      fs::remove_all(log);
+    }
+
+    static const DirectoryRAII& get()
+    {
+      static DirectoryRAII _;
+      return _;
+    }
+
+    const fs::path log;
+};
+
+int main (int argc, char** argv)
+try
+{
+  logging::LoggingOptions logOptions;
+  logOptions.logsDirectory = DirectoryRAII::get().log;
+  auto& log = logging::Log::instance("playground", logOptions.serialize());
+  {
+    logging::ScopeProfiler p(log, "run");
+    run();
+  }
+  {
+    ::gitfan::logging::statistics::PerformanceDumpReader<> reader(false);
+    for ( fs::recursive_directory_iterator file
+            (DirectoryRAII::get().log / "performance_dumps")
+          , end
+        ; file != end
+        ; ++file
+        )
+    {
+      reader.readDump(file->path());
+    }
+    std::cout << reader << "\n" << std::endl;
+  }
+  {
+    ::gitfan::logging::statistics::CounterDumpReader reader;
+    for ( fs::recursive_directory_iterator file
+            (DirectoryRAII::get().log / "counter_dumps")
+          , end
+        ; file != end
+        ; ++file
+        )
+    {
+      reader.readDump(file->path());
+    }
+    std::cout << reader << "\n" << std::endl;
+  }
+
+  return 0;
+}
+catch (...)
+{
+  std::cerr << "EXCEPTION: "
+            << fhg::util::current_exception_printer()
+            << std::endl
+    ;
+
+  return -1;
+}

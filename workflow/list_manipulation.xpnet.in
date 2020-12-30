@@ -1,0 +1,204 @@
+<defun name="@TEMPLATE_PREFIX@">
+  <include-structs href="types.xpnet"/>
+
+  <tunnel name="inout_list" type="list" place="inout_list"/>
+  <tunnel name="in_args" type="@TEMPLATE_ARGS_TYPE@" place="in_args"/>
+  <tunnel name="in_config" type="config" place="in_config"/>
+  <in name="enabled" type="control" place="enabled"/>
+  <out name="finished" type="control" place="finished"/>
+  <net>
+    <place name="inout_list" type="list" virtual="true"/>
+    <place name="in_args" type="@TEMPLATE_ARGS_TYPE@" virtual="true"/>
+    <place name="in_config" type="config" virtual="true"/>
+    <place name="enabled" type="control"/>
+    <place name="finished" type="control"/>
+    <place name="skip" type="bool"/>
+    <place name="batch_size" type="unsigned long"/>
+    <place name="list_size" type="unsigned long"/>
+    <place name="last_task" type="range"/>
+    <place name="open_tasks" type="range"/>
+    <place name="processed_elements" type="list"/>
+    <place name="processed_list" type="list"/>
+    <place name="number_of_open_tasks" type="unsigned long"/>
+    <place name="all_tasks_generated" type="bool"/>
+    <transition name="init">
+      <defun>
+        <in name="enabled" type="control"/>
+        <in name="config" type="config"/>
+        <in name="args" type="@TEMPLATE_ARGS_TYPE@"/>
+        <out name="skip" type="bool"/>
+        <out name="batch_size" type="unsigned long"/>
+        <module name="gitfan"
+                function="@TEMPLATE_PREFIX@_init(config, args, skip, batch_size)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="workflow/list_manipulation_function_container.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+              ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "@TEMPLATE_PREFIX@_init"
+              );
+            ::gitfan::@TEMPLATE_PREFIX@_init(config, args, skip, batch_size);
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="config" place="in_config"/>
+      <connect-read port="args" place="in_args"/>
+      <connect-in port="enabled" place="enabled"/>
+      <connect-out port="skip" place="skip"/>
+      <connect-out port="batch_size" place="batch_size"/>
+    </transition>
+    <transition name="skip">
+      <defun>
+        <in name="skip" type="bool"/>
+        <in name="batch_size" type="unsigned long"/>
+        <out name="finished" type="control"/>
+        <expression>
+          ${finished} := [];
+        </expression>
+      </defun>
+      <condition>${skip}</condition>
+      <connect-in port="skip" place="skip"/>
+      <connect-in port="batch_size" place="batch_size"/>
+      <connect-out port="finished" place="finished"/>
+    </transition>
+    <transition name="no_skip">
+      <defun>
+        <in name="skip" type="bool"/>
+        <in name="list" type="list"/>
+        <in name="batch_size" type="unsigned long"/>
+        <out name="list_size" type="unsigned long"/>
+        <out name="last_task" type="range"/>
+        <out name="open_tasks" type="range"/>
+        <out name="number_of_open_tasks" type="unsigned long"/>
+        <out name="all_tasks_generated" type="bool"/>
+        <out name="empty_list" type="list"/>
+        <expression>
+          ${list_size} := stack_size(${list});
+          ${length} := min(${list_size}, ${batch_size});
+          ${open_tasks.start} := 0UL;
+          ${open_tasks.length} := ${length};
+          ${last_task} := ${open_tasks};
+          ${number_of_open_tasks} := 1UL;
+          ${all_tasks_generated} := ${length} :ge: ${list_size};
+          ${empty_list} := List ();
+        </expression>
+      </defun>
+      <condition>!${skip}</condition>
+      <connect-in port="skip" place="skip"/>
+      <connect-read port="list" place="inout_list"/>
+      <connect-read port="batch_size" place="batch_size"/>
+      <connect-out port="list_size" place="list_size"/>
+      <connect-out port="last_task" place="last_task"/>
+      <connect-out port="open_tasks" place="open_tasks"/>
+      <connect-out port="number_of_open_tasks" place="number_of_open_tasks"/>
+      <connect-out port="all_tasks_generated" place="all_tasks_generated"/>
+      <connect-out port="empty_list" place="processed_list"/>
+    </transition>
+    <transition name="generate_tasks">
+      <defun>
+        <inout name="all_tasks_generated" type="bool"/>
+        <in name="batch_size" type="unsigned long"/>
+        <in name="list_size" type="unsigned long"/>
+        <inout name="last_task" type="range"/>
+        <out name="open_tasks" type="range"/>
+        <inout name="inc" type="unsigned long"/>
+        <expression>
+          ${start} := ${last_task.start} + ${last_task.length};
+          ${length} := min(${list_size} - ${start}, ${batch_size});
+          ${open_tasks.start} := ${start};
+          ${open_tasks.length} := ${length};
+          ${last_task} := ${open_tasks};
+          ${inc} := ${inc} + 1UL;
+          ${all_tasks_generated} := (${start} + ${length}) :ge: ${list_size};
+        </expression>
+      </defun>
+      <condition>!${all_tasks_generated}</condition>
+      <connect-inout port="all_tasks_generated" place="all_tasks_generated"/>
+      <connect-read port="batch_size" place="batch_size"/>
+      <connect-read port="list_size" place="list_size"/>
+      <connect-inout port="last_task" place="last_task"/>
+      <connect-out port="open_tasks" place="open_tasks"/>
+      <connect-inout port="inc" place="number_of_open_tasks"/>
+    </transition>
+    <transition name="process">
+      <defun>
+        <in name="list" type="list"/>
+        <in name="open_tasks" type="range"/>
+        <in name="config" type="config"/>
+        <in name="args" type="@TEMPLATE_ARGS_TYPE@"/>
+        <out name="result" type="list"/>
+        <module name="gitfan"
+                function="result @TEMPLATE_PREFIX@_process(list, open_tasks,
+                                         config, args)"
+                pass_context="true"
+                require_function_unloads_without_rest="false"
+                require_module_unloads_without_rest="false">
+          <cinclude href="workflow/list_manipulation_function_container.hpp"/>
+          <cinclude href="logging/scope_profiler.hpp"/>
+          <code><![CDATA[
+            ::gitfan::logging::ScopeProfiler profiler
+             ( ::gitfan::logging::Log::instance
+                (_pnetc_context, config.logging_options)
+              , "@TEMPLATE_PREFIX@_process"
+              );
+            //const auto start(std::next (list.cbegin(), open_tasks.start));
+            //const auto end(std::next (start, open_tasks.length));
+            return ::gitfan::@TEMPLATE_PREFIX@_process
+              (list, open_tasks.start, open_tasks.length, config, args);
+          ]]></code>
+        </module>
+      </defun>
+      <connect-read port="list" place="inout_list"/>
+      <connect-in port="open_tasks" place="open_tasks"/>
+      <connect-read port="config" place="in_config"/>
+      <connect-read port="args" place="in_args"/>
+      <connect-out port="result" place="processed_elements"/>
+    </transition>
+    <transition name="aggregate">
+      <defun>
+        <inout name="list" type="list"/>
+        <in name="elements" type="list"/>
+        <inout name="dec" type="unsigned long"/>
+        <expression>
+          ${list} := stack_join (${list},${elements});
+          ${dec} := ${dec} - 1UL;
+        </expression>
+      </defun>
+      <connect-inout port="list" place="processed_list"/>
+      <connect-in port="elements" place="processed_elements"/>
+      <connect-inout port="dec" place="number_of_open_tasks"/>
+    </transition>
+    <transition name="clean">
+      <defun>
+        <in name="all_tasks_generated" type="bool"/>
+        <in name="number_of_open_tasks" type="unsigned long"/>
+        <in name="processed_list" type="list"/>
+        <inout name="inout_list" type="list"/>
+        <out name="finished" type="control"/>
+        <in name="list_size" type="unsigned long"/>
+        <in name="last_task" type="range"/>
+        <in name="batch_size" type="unsigned long"/>
+        <expression>
+          ${inout_list} := ${processed_list};
+          ${finished} := [];
+        </expression>
+      </defun>
+      <condition>
+        ${all_tasks_generated} :and:
+        ${number_of_open_tasks} :eq: 0UL
+      </condition>
+      <connect-in port="all_tasks_generated" place="all_tasks_generated"/>
+      <connect-in port="number_of_open_tasks" place="number_of_open_tasks"/>
+      <connect-in port="processed_list" place="processed_list"/>
+      <connect-inout port="inout_list" place="inout_list"/>
+      <connect-out port="finished" place="finished"/>
+      <connect-in port="list_size" place="list_size"/>
+      <connect-in port="last_task" place="last_task"/>
+      <connect-in port="batch_size" place="batch_size"/>
+    </transition>
+  </net>
+</defun>

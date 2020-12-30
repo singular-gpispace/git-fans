@@ -1,0 +1,36 @@
+#include <gtest/gtest.h>
+
+#include <util-gitfan/singular_commands.hpp>
+
+#include <boost/filesystem.hpp>
+
+#include <util.hpp>
+#include <temporaryUniquePath.hpp>
+
+using namespace gitfan::testing;
+namespace fs = boost::filesystem;
+
+namespace singular {
+namespace testing
+{
+  TEST(SingularCommandsTest, canWriteSSIFile)
+  {
+    EXPECT_TRUE(init());
+
+    call_and_discard("\
+      ring R = 0,T(1..10),wp(1,1,1,1,1,1,1,1,1,1);\
+      ideal I =\
+        T(5)*T(10)-T(6)*T(9)+T(7)*T(8),\
+        T(1)*T(9)-T(2)*T(7)+T(4)*T(5),\
+        T(1)*T(8)-T(2)*T(6)+T(3)*T(5),\
+        T(1)*T(10)-T(3)*T(7)+T(4)*T(6),\
+        T(2)*T(10)-T(3)*T(9)+T(4)*T(8);\
+      ");
+
+    fs::path expectedFile("@SINGULAR_TESTDATA_DIR@/m5_ideal");
+    util::TemporaryUniquePath outputFile("ssi-output");
+    write_ssi("I", outputFile.string());
+    EXPECT_PRED2(&util::ssiFilesExistWithIdenticalContent,
+                expectedFile, (fs::path)outputFile);
+  }
+}}

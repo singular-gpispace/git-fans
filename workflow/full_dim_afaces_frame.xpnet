@@ -1,0 +1,30 @@
+<defun name="gitfan">
+
+  <include-structs href="types.xpnet"/>
+
+  <in name="problem_data" type="problem_data" place="input_data"/>
+  <in name="config" type="config" place="config"/>
+  <out name="full_dim_afaces" type="list" place="full_dim_afaces"/>
+  <out name="finished" type="control" place="end"/>
+
+  <net>
+    <place name="input_data" type="problem_data"/>
+    <place name="config" type="config"/>
+    <place name="full_dim_afaces" type="list"/>
+
+    <place name="start" type="control">
+      <token><value>[]</value></token>
+    </place>
+    <place name="end" type="control"/>
+
+    <transition name="full_dim_afaces">
+      <include-function href="full_dim_afaces.xpnet"/>
+      <place-map virtual="in_data" real="input_data"/>
+      <place-map virtual="in_config" real="config"/>
+      <place-map virtual="out_full_dim_afaces" real="full_dim_afaces"/>
+      <connect-in port="enabled" place="start"/>
+      <connect-out port="finished" place="end"/>
+    </transition>
+
+  </net>
+</defun>

@@ -1,0 +1,90 @@
+#include <installation.hpp>
+
+#include <boost/filesystem.hpp>
+#include <boost/format.hpp>
+
+#include <stdexcept>
+
+namespace gitfan
+{
+  namespace
+  {
+    void check ( boost::filesystem::path const& path
+               , bool okay
+               , std::string const& message
+               )
+    {
+      if (!okay)
+      {
+        throw std::logic_error
+          ( ( boost::format ("%1% %2%: Installation incomplete!?")
+            % path
+            % message
+            ).str()
+          );
+      }
+    }
+
+    void check_is_directory (boost::filesystem::path const& path)
+    {
+      check ( path
+            , boost::filesystem::is_directory (path)
+            , "is not a directory"
+            );
+    }
+    void check_is_file (boost::filesystem::path const& path)
+    {
+      check ( path
+            , boost::filesystem::exists (path)
+            , "does not exist"
+            );
+      check ( path
+            , boost::filesystem::is_regular_file (path)
+            , "is not a regular file"
+            );
+    }
+
+    boost::filesystem::path gspc_home
+      (boost::filesystem::path const& installation_path)
+    {
+      return installation_path / "@BUNDLE_GPISPACE@";
+    }
+    boost::filesystem::path libraries_path
+      (boost::filesystem::path const& installation_path)
+    {
+      return installation_path / "@LIB_INSTALLATION@";
+    }
+    boost::filesystem::path workflow_path
+      (boost::filesystem::path const& installation_path)
+    {
+      return installation_path / "@WORKFLOW_INSTALLATION@";
+    }
+    boost::filesystem::path workflow_file
+      (boost::filesystem::path const& installation_path)
+    {
+      return workflow_path (installation_path) / "@PNET@";
+    }
+  }
+  installation::installation (boost::program_options::variables_map const& vm,
+                              const boost::filesystem::path& installPath)
+    : _path (installPath)
+  {
+    check_is_directory (gspc_home (_path));
+    check_is_directory (libraries_path (_path));
+    check_is_directory (workflow_path (_path));
+    check_is_file (workflow());
+
+    gspc::set_application_search_path
+      ( const_cast<boost::program_options::variables_map&> (vm)
+      , libraries_path (_path)
+      );
+  }
+  gspc::installation installation::gspc_installation() const
+  {
+    return {gspc_home (_path)};
+  }
+  boost::filesystem::path installation::workflow() const
+  {
+    return workflow_file (_path);
+  }
+}

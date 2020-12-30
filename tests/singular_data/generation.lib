@@ -1,0 +1,203 @@
+////////////////////////////////////////////////////////////////////////////////
+// Some helper methods.                                                       //
+////////////////////////////////////////////////////////////////////////////////
+
+proc bigint2hexString(bigint n, int stringLength)
+{
+  string hex = "";
+  bigint remainder;
+  for (int i = 0; i < stringLength; i++)
+  {
+    remainder = n mod 16;
+    n = n div 16;
+    if (remainder == 0) { hex = "0" + hex; }
+    if (remainder == 1) { hex = "1" + hex; }
+    if (remainder == 2) { hex = "2" + hex; }
+    if (remainder == 3) { hex = "3" + hex; }
+    if (remainder == 4) { hex = "4" + hex; }
+    if (remainder == 5) { hex = "5" + hex; }
+    if (remainder == 6) { hex = "6" + hex; }
+    if (remainder == 7) { hex = "7" + hex; }
+    if (remainder == 8) { hex = "8" + hex; }
+    if (remainder == 9) { hex = "9" + hex; }
+    if (remainder == 10) { hex = "a" + hex; }
+    if (remainder == 11) { hex = "b" + hex; }
+    if (remainder == 12) { hex = "c" + hex; }
+    if (remainder == 13) { hex = "d" + hex; }
+    if (remainder == 14) { hex = "e" + hex; }
+    if (remainder == 15) { hex = "f" + hex; }
+  }
+  return(hex);
+}
+
+proc printList(list L)
+{
+  for (int i = 1; i <= size(L); i++)
+  {
+    L[i];
+  }
+}
+
+proc writeListToFile(string file, list L)
+{
+  for (int i = 1; i <= size(L); i++)
+  {
+    write(file, L[i]);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Copied over from gitfanparallel.lib (methods have been manually tested)    //
+////////////////////////////////////////////////////////////////////////////////
+
+proc minimalRepresentative(intvec elem, list groupAction)
+{
+  bigint biMin = binaryToBigint(elem);
+  bigint biCur;
+  intvec min = elem;
+  intvec cur;
+  for (int i = 1; i <= size(groupAction); i++)
+  {
+    cur = applyPermutationToIntvec(elem, groupAction[i]);
+    biCur = binaryToBigint(cur);
+    if (biCur < biMin)
+    {
+      biMin = biCur;
+      min = cur;
+    }
+  }
+  return(min);
+}
+
+proc findOrbitRepresentatives(list G, int #)
+"USAGE: findOrbits(G [,d]); G list of permutations in a subgroup of the symmetric group; d int minimum cardinality of simplices to be considered; if d is not specified it is considered to be 1
+PURPOSE: Computes representatives of the orbits of the action of G
+RETURN: list of intvec.
+"
+{
+  // Rewritten by Christian Reinbold.
+  int minimumCardinality = 1;
+  if (size(#)>0) { minimumCardinality=#; }
+
+  int n = size(permutationToIntvec(G[1]));
+  if (n >= 31)
+  {
+    ERROR("findOrbits() overflows for n >= 31");
+  }
+  int i;
+  list representatives;
+  intvec unhandled;
+  intvec current;
+  intvec finished = 0:(2^n - 1); // Place 2^n-1 zeroes (=false) in finished
+  bigint biUnhandled;
+  bigint biCurrent;
+
+  while(1)
+  {
+    for ( biUnhandled = 1
+        ; biUnhandled <= size(finished)
+        ; biUnhandled = biUnhandled + 1
+        )
+    {
+      if (!finished[int(biUnhandled)]) { break; }
+    }
+    if (biUnhandled > size(finished)) { break; }
+    unhandled = bigintToBinary(biUnhandled, n);
+    if (size(unhandled) < minimumCardinality)
+    {
+      finished[int(biUnhandled)] = 1; // set to true
+      continue;
+    }
+
+    representatives[size(representatives) + 1] = unhandled;
+    for (i = 1; i <= size(G); i++)
+    {
+      current = applyPermutationToIntvec(unhandled, G[i]);
+      biCurrent = binaryToBigint(current);
+      if (!finished[int(biCurrent)])
+      {
+        finished[int(biCurrent)] = 1; // set to true
+      }
+    }
+  }
+  return(representatives);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Some methods copied from gitfan.lib, which were declared static.           //
+////////////////////////////////////////////////////////////////////////////////
+
+proc getNeighborHash(list OC, bigintmat w, bigintmat v, int mu)
+{
+  int success = 0;
+  int zz;
+  intvec Jtmp;
+  bigintmat wtmp;
+
+  while(!success)
+  {
+    mu = mu*2;
+    wtmp = mu*w - v;
+    success = 1;
+    for(zz = 1; zz <= size(OC); zz++)
+    {
+      if(containsInSupport(OC[zz], wtmp))
+      {
+        if(!containsInSupport(OC[zz], w))
+        {
+          success = 0;
+          Jtmp = 0;
+          break;
+        }
+        // insert index zz:
+        if(size(Jtmp) ==1 && Jtmp[1] == 0)
+        {
+          Jtmp[1] = zz;
+        }
+        else
+        {
+          Jtmp[size(Jtmp)+1] = zz;
+        }
+      }
+    }
+  }
+
+  return(Jtmp);
+}
+
+proc listOfFacetsAndInteriorVectors(cone lambda, cone Qgamma){
+  list FL;
+  int numboundary;
+
+  bigintmat FL0 = facets(lambda);
+  bigintmat H[1][ncols(FL0)];
+  bigintmat FL1[nrows(FL0)-1][ncols(FL0)]; // delete row of H from FL0
+
+  bigintmat w;
+  cone facetCone;
+  for(int i = 1; i <= nrows(FL0); i++){
+    H = FL0[i,1..ncols(FL0)];
+
+    if(i > 1 and i < nrows(FL0)){
+      FL1 = FL0[1..i-1, 1..ncols(FL0)], FL0[i+1..nrows(FL0), 1..ncols(FL0)];
+    } else {
+      if(i == nrows(FL0)){
+        FL1 = FL0[1..i-1, 1..ncols(FL0)];
+      } else { // i = 1:
+        FL1 = FL0[2..nrows(FL0), 1..ncols(FL0)];
+      }
+    }
+
+    facetCone = coneViaInequalities(FL1, H);
+
+    w = relativeInteriorPoint(facetCone);
+
+    if(containsRelatively(Qgamma,w)){
+      FL[size(FL) + 1] = list(H,w);
+    } else {
+      numboundary=numboundary+1;
+    }
+  }
+
+  return(list(FL,numboundary));
+}
