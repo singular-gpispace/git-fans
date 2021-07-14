@@ -112,7 +112,7 @@ $GITFAN_HOME/bin/GITFAN \
     --job-size 10 \
     --working-directory "$WDIR" \
     --ideal "$GITFAN_REPO/input_files/m6_reduced_ideal" \
-    --torus-action "$GITFAN_REPO/input_files/m6_reduced_itorus_action" \
+    --torus-action "$GITFAN_REPO/input_files/m6_reduced_torus_action" \
     --symmetry-group "$GITFAN_REPO/input_files/m6_reduced_symmetry_group" \
     --simplex-orbit-representatives "$GITFAN_REPO/input_files/m6_reduced_simplex_orbit_representatives" \
     --moving-cone "$WDIR/moving_cone" \
