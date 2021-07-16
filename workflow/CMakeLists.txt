@@ -70,8 +70,8 @@ macro(add_petrinet in out)
             --gen-ldflags="-L${GSPC_HOME}/external/boost/lib"
             --gen-ldflags="-lboost_program_options"
             --gen-ldflags="-Wl,-rpath='\\$\$\\$\$ORIGIN'"
-            --gen-ldflags="-Wl,-rpath='\\$\$\\$\$ORIGIN/../libexec/bundle/gpispace/lib'"
-            --gen-ldflags="-Wl,-rpath='\\$\$\\$\$ORIGIN/../libexec/bundle/gpispace/external/boost/lib'"
+            --gen-ldflags="-Wl,-rpath='${GSPC_HOME}/lib'"
+            --gen-ldflags="-Wl,-rpath='${GSPC_HOME}/external/boost/lib'"
             --force-overwrite-file=true
             --input="${CMAKE_CURRENT_BINARY_DIR}/${in}"
             --output="${CMAKE_CURRENT_BINARY_DIR}/${out}"

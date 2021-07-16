@@ -65,7 +65,7 @@ namespace testing
         : worker_per_node(4)
         , working_directory(fs::current_path().string() + "/test-wdir")
         , gspc_installation(fhg::util::cxx14::make_unique<gspc::installation>
-            (fs::path("@CMAKE_INSTALL_PREFIX@") / "@BUNDLE_GPISPACE@"))
+            (fs::path("@GSPC_HOME@")))
         , nodefile(fhg::util::cxx14::make_unique<util::TemporaryUniquePath>
             ("test-nodefile"))
         , storageServiceProvider(

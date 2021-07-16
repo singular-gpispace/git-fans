@@ -44,10 +44,9 @@ namespace gitfan
             );
     }
 
-    boost::filesystem::path gspc_home
-      (boost::filesystem::path const& installation_path)
+    boost::filesystem::path gspc_home()
     {
-      return installation_path / "@BUNDLE_GPISPACE@";
+      return "@GSPC_HOME@";
     }
     boost::filesystem::path libraries_path
       (boost::filesystem::path const& installation_path)
@@ -69,7 +68,7 @@ namespace gitfan
                               const boost::filesystem::path& installPath)
     : _path (installPath)
   {
-    check_is_directory (gspc_home (_path));
+    check_is_directory (gspc_home());
     check_is_directory (libraries_path (_path));
     check_is_directory (workflow_path (_path));
     check_is_file (workflow());
@@ -81,7 +80,7 @@ namespace gitfan
   }
   gspc::installation installation::gspc_installation() const
   {
-    return {gspc_home (_path)};
+    return {gspc_home()};
   }
   boost::filesystem::path installation::workflow() const
   {

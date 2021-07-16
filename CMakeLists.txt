@@ -8,6 +8,8 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
 
+set (INSTALL_DO_NOT_BUNDLE ON CACHE BOOL "")
+
 set (PNET "gitfan.pnet")
 set (WORKFLOW_INSTALLATION "workflow")
 set (LIB_INSTALLATION "libexec")
@@ -30,21 +32,9 @@ find_boost (1.63 REQUIRED QUIET FROM_GPISPACE_INSTALLATION COMPONENTS
   unit_test_framework
 )
 
-
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
-list (APPEND INSTALL_RPATH_DIRS "libexec/bundle/gpispace/lib")
+
 find_package (Singular REQUIRED)
-
-set (BUNDLE_GPISPACE "libexec/bundle/gpispace")
-bundle_GPISpace (DESTINATION "${BUNDLE_GPISPACE}"
-  COMPONENTS "runtime"
-             "monitoring"
-)
-
-install (DIRECTORY "${SINGULAR_HOME}/"
-  DESTINATION libexec/bundle/singular
-  USE_SOURCE_PERMISSIONS
-)
 
 include_directories ("${CMAKE_SOURCE_DIR}/src")
 include_directories ("${CMAKE_BINARY_DIR}")

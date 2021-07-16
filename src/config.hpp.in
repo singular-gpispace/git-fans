@@ -6,12 +6,14 @@
 
 namespace config
 {
-  static boost::filesystem::path const installation("@CMAKE_INSTALL_PREFIX@");
+  static boost::filesystem::path const installation ("@CMAKE_INSTALL_PREFIX@");
+
+  static boost::filesystem::path const singular_home ("@SINGULAR_HOME@");
 
   inline boost::filesystem::path const& singularLibrary()
   {
     static boost::filesystem::path const library(
-      installation / "libexec" / "bundle" / "singular" / "lib" / "libSingular.so"
+      singular_home / "lib" / "libSingular.so"
     );
     return library;
   }
