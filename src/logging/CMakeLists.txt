@@ -1,4 +1,4 @@
-include (add_macros)
+include (util-cmake/add_macros)
 
 extended_add_library (
   NAME Logging

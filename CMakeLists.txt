@@ -14,9 +14,9 @@ set (WORKFLOW_INSTALLATION "workflow")
 set (LIB_INSTALLATION "libexec")
 
 add_subdirectory (${GPISPACE_REPO}/cmake cmake)
-include (add_macros)
-include (beautify_find_boost)
-include (beautify_find_GPISpace)
+include (util-cmake/add_macros)
+include (util-cmake/beautify_find_boost)
+include (util-cmake/beautify_find_GPISpace)
 find_GPISpace (REVISION 460e02ac5b0d3fbd494e3e774d5bd595e0272381)
 find_boost (1.63 REQUIRED QUIET FROM_GPISPACE_INSTALLATION COMPONENTS
   date_time
