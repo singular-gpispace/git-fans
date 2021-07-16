@@ -46,9 +46,9 @@ GIT-Fans can be built as follows: First, run cmake to generate the build files.
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
+GPISpace_ROOT=$GPISPACE_INSTALL \
 cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
       -DCMAKE_BUILD_TYPE=Release \
-      -DGSPC_HOME=$GPISPACE_INSTALL \
       -DALLOW_ANY_GPISPACE_VERSION=true \
       -DGPISPACE_REPO=$GPISPACE_REPO \
       -DSINGULAR_HOME=$SINGULAR_INSTALL \
