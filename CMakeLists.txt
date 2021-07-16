@@ -48,7 +48,7 @@ install (DIRECTORY "${SINGULAR_HOME}/"
 
 include_directories ("${CMAKE_SOURCE_DIR}/src")
 include_directories ("${CMAKE_BINARY_DIR}")
-include_directories("${GPISPACE_REPO}/src")
+include_directories ("${GPISPACE_REPO}/src")
 
 add_subdirectory (${GPISPACE_REPO}/src/util-generic src/util-generic)
 add_subdirectory (${GPISPACE_REPO}/src/rpc src/rpc)
@@ -57,6 +57,7 @@ add_subdirectory (src)
 add_subdirectory (workflow)
 
 if (BUILD_TESTING)
+  set (INSTALL_GTEST OFF CACHE BOOL "")
   add_subdirectory (googletest)
   add_subdirectory (tests)
   target_compile_options (gmock PRIVATE "-Wno-error=deprecated-copy")
