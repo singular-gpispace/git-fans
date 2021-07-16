@@ -121,7 +121,7 @@ $GITFAN_HOME/bin/GITFAN \
 
 echo "Generating statistics"
 $GITFAN_HOME/bin/generate_statistics \
-    --performance-dumps="$WDIR/logs/performance_dumps" 
+    --performance-dumps="$WDIR/logs/performance_dumps" \
     --counter-dumps="$WDIR/logs/counter_dumps" \
     > $WDIR/logs/statistics
 ```
