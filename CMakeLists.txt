@@ -17,7 +17,7 @@ add_subdirectory (${GPISPACE_REPO}/cmake cmake)
 include (util-cmake/add_macros)
 include (util-cmake/beautify_find_boost)
 include (util-cmake/beautify_find_GPISpace)
-find_GPISpace (REVISION 460e02ac5b0d3fbd494e3e774d5bd595e0272381)
+find_package (GPISpace 21.06 EXACT REQUIRED)
 find_boost (1.63 REQUIRED QUIET FROM_GPISPACE_INSTALLATION COMPONENTS
   date_time
   filesystem
