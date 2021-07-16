@@ -78,7 +78,7 @@ find_path (GMP_INCLUDE_DIR
 
 find_library (GMP_LIBRARY
   NAMES "gmp"
-  ${GMP_HOME} ENV GMP_HOME
+  HINTS ${GMP_HOME} ENV GMP_HOME
 )
 
 mark_as_advanced ( SINGULAR_HOME
