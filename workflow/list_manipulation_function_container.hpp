@@ -70,13 +70,14 @@ namespace gitfan
     , const pnet_problem_data& args
     )
   {
-    auto computeOrbitCone = RESOLVE_INTERFACE_FUNCTION(computeOrbitCone);
+    //auto computeOrbitCone = RESOLVE_INTERFACE_FUNCTION(computeOrbitCone);
     pnet_list result;
     const auto start(std::next (list.cbegin(), startIndex));
     const auto end(std::next (start, length));
     std::for_each(start, end, [&](const pnet_value& aface)
     {
-      result.push_back(pnetc::type::file::to_value(computeOrbitCone
+      result.push_back(pnetc::type::file::to_value(
+        RESOLVE_INTERFACE_FUNCTION(computeOrbitCone)
         (as<pnet_list>(aface), args, config.working_directory)));
     });
     return result;
@@ -103,12 +104,13 @@ namespace gitfan
     , const pnet_problem_data& args
     )
   {
-    auto intersectWithMovingCone =
-      RESOLVE_INTERFACE_FUNCTION(intersectWithMovingCone);
+    //auto intersectWithMovingCone =
+    //  RESOLVE_INTERFACE_FUNCTION(intersectWithMovingCone);
     const auto start(std::next (orbitCones.cbegin(), startIndex));
     const auto end(std::next (start, length));
     pnet_list batchOfOrbitCones(start, end);
-    return intersectWithMovingCone(args, batchOfOrbitCones);
+    return RESOLVE_INTERFACE_FUNCTION(intersectWithMovingCone)
+      (args, batchOfOrbitCones);
   }
 
 // expand_orbit_cone_orbits --------------------------------------------------//
@@ -136,13 +138,13 @@ namespace gitfan
     , const pnet_problem_data& args
     )
   {
-    auto expandOrbitConeOrbit =
-      RESOLVE_INTERFACE_FUNCTION(expandOrbitConeOrbit);
+    //auto expandOrbitConeOrbit =
+    //  RESOLVE_INTERFACE_FUNCTION(expandOrbitConeOrbit);
     pnet_list result;
     auto orbitCone(std::next (orbitCones.cbegin(), startIndex));
     for (int i = startIndex; i < startIndex + length; i++)
     {
-      result.push_back(expandOrbitConeOrbit
+      result.push_back(RESOLVE_INTERFACE_FUNCTION(expandOrbitConeOrbit)
         ( args
         , config.working_directory
         , pnetc::type::file::from_value(*orbitCone)
@@ -174,13 +176,14 @@ namespace gitfan
     , const pnet_problem_data& args
     )
   {
-    auto isLastOfAllEqualOrbitConeOrbits =
-      RESOLVE_INTERFACE_FUNCTION(isLastOfAllEqualOrbitConeOrbits);
+    //auto isLastOfAllEqualOrbitConeOrbits =
+    //  RESOLVE_INTERFACE_FUNCTION(isLastOfAllEqualOrbitConeOrbits);
     pnet_list result;
     auto orbitInfo(std::next (orbitInfos.cbegin(), startIndex));
     for (int i = 0; i < length; i++)
     {
-      if (isLastOfAllEqualOrbitConeOrbits(args, orbitInfos, orbitInfo))
+      if (RESOLVE_INTERFACE_FUNCTION(isLastOfAllEqualOrbitConeOrbits)
+            (args, orbitInfos, orbitInfo))
       {
         result.push_back(*orbitInfo);
       }

@@ -18,12 +18,14 @@
 #include <functional>
 
 #define RESOLVE_INTERFACE_FUNCTION(function) \
-  ::gitfan::interface::resolve<decltype(::gitfan::interface::function)> \
-    (BOOST_PP_STRINGIZE(function))
+  (fhg::util::scoped_dlhandle \
+    (config::gitfanInterfaceLibrary(), RTLD_GLOBAL | RTLD_NOW | RTLD_DEEPBIND) \
+    .sym<decltype(::gitfan::interface::function)>(BOOST_PP_STRINGIZE(function)))
 
 namespace gitfan {
 namespace interface
 {
+  /*
   template <typename T>
   std::function<T> resolve(const std::string& symbol)
   {
@@ -31,6 +33,7 @@ namespace interface
       (config::gitfanInterfaceLibrary(), RTLD_GLOBAL | RTLD_NOW | RTLD_DEEPBIND)
       .sym<T>(symbol);
   }
+  */
 
   NO_NAME_MANGLING
   storage::Options initStorageOptions
