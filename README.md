@@ -36,7 +36,6 @@ We assume
 - `$GPISPACE_REPO` to be the root of the checked out GPI-Space repository containing the GPI-Space sources
 - `$GPISPACE_INSTALL` to be the root of the GPI-Space installation
 - `$SINGULAR_INSTALL` to be the root of the Singular installation (the path of the `--prefix` argument when configuring Singular)
-- `$FLINT_INSTALL` to be the root of the flint installation (the path of the `--prefix` argument when configuring flint)
 - `$ROOT_DIR` to be the root of the checked out GIT-Fans repository
 - `$BUILD_DIR` to be a path to a (potentially nonexisting) directory where build files are created
 - `$INSTALL_DIR` to be the directory where GIT-Fans is going to be installed
@@ -53,7 +52,6 @@ cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
       -DALLOW_ANY_GPISPACE_VERSION=true \
       -DGPISPACE_REPO=$GPISPACE_REPO \
       -DSINGULAR_HOME=$SINGULAR_INSTALL \
-      -DFLINT_HOME=$FLINT_INSTALL \
       $ROOT_DIR
 ```
 
