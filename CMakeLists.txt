@@ -1,5 +1,5 @@
-project (gitfan LANGUAGES CXX)
 cmake_minimum_required (VERSION 3.13)
+project (gitfan LANGUAGES CXX)
 
 enable_testing()
 
