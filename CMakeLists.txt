@@ -15,6 +15,7 @@ set (LIB_INSTALLATION "libexec")
 
 add_subdirectory (${GPISPACE_REPO}/cmake cmake)
 include (util-cmake/add_macros)
+include (util-cmake/add_unit_test)
 include (util-cmake/beautify_find_boost)
 include (util-cmake/beautify_find_GPISpace)
 find_package (GPISpace 21.06 EXACT REQUIRED)
