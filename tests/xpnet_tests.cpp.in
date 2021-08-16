@@ -3,7 +3,6 @@
 #include <drts/client.hpp>
 #include <drts/drts.hpp>
 #include <drts/scoped_rifd.hpp>
-#include <installation.hpp>
 
 #include <fhg/util/boost/program_options/generic.hpp>
 
