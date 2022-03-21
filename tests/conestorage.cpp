@@ -4,13 +4,15 @@
 #include <storage/service_provider.hpp>
 
 #include <util-generic/read_lines.hpp>
-#include <util-generic/cxx14/make_unique.hpp>
+
 
 #include <util.hpp>
 #include <temporaryUniquePath.hpp>
 
+#include <memory>
 #include <vector>
 #include <string>
+
 
 namespace gitfan {
 namespace storage {
@@ -26,7 +28,7 @@ namespace testing
 
       void SetUp() override
       {
-        _path = fhg::util::cxx14::make_unique
+        _path = std::make_unique
           <gitfan::testing::util::TemporaryUniquePath>
             ("test-storage-" + GetParam());
 
@@ -34,7 +36,7 @@ namespace testing
         opt.implementationTag = GetParam();
         opt.workingDirectory = *_path;
 
-        _serviceProvider = fhg::util::cxx14::make_unique<ServiceProvider>(opt);
+        _serviceProvider = std::make_unique<ServiceProvider>(opt);
         storage = IConeStorage::build (opt.serialize());
       }
 

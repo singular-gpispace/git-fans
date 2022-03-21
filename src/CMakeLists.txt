@@ -49,7 +49,8 @@ extended_add_library (NAME installation
 extended_add_executable (NAME GITFAN DONT_APPEND_EXE_SUFFIX
   SOURCES "bin/gitfan.cpp"
   INCLUDE_DIRECTORIES PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
-  LIBRARIES partial_static_${PNET}_wrapper
+  LIBRARIES 
+    PRIVATE partial_static_${PNET}_wrapper
             GITFAN::installation
             GITFAN::storage
             GPISpace::execution

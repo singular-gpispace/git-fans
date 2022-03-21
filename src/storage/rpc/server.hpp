@@ -3,8 +3,8 @@
 #include <storage/service_provider.hpp>
 #include <storage/rpc/protocol.hpp>
 
-#include <rpc/locked_with_info_file.hpp>
-#include <rpc/service_handler.hpp>
+#include <util-rpc/locked_with_info_file.hpp>
+#include <util-rpc/service_handler.hpp>
 
 #include <util-generic/scoped_boost_asio_io_service_with_threads.hpp>
 

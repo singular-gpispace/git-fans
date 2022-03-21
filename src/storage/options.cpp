@@ -5,9 +5,9 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/program_options.hpp>
 
-#include <fhg/util/boost/program_options/generic.hpp>
-#include <fhg/util/boost/program_options/validators/positive_integral.hpp>
-#include <fhg/util/boost/program_options/validators/nonempty_string.hpp>
+#include <util-generic/boost/program_options/generic.hpp>
+#include <util-generic/boost/program_options/validators/positive_integral.hpp>
+#include <util-generic/boost/program_options/validators/nonempty_string.hpp>
 
 #include <util-generic/serialization/boost/filesystem/path.hpp>
 #include <util-generic/join.hpp>

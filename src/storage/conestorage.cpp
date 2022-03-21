@@ -3,10 +3,11 @@
 #include <storage/filesystem/constant_conestorage.hpp>
 #include <storage/rpc/client.hpp>
 
-#include <util-generic/cxx14/make_unique.hpp>
 
-#include <vector>
+
 #include <map>
+#include <memory>
+#include <vector>
 
 using namespace std;
 namespace fs = boost::filesystem;
@@ -23,21 +24,21 @@ namespace storage
       { { "linear"
         , [](const Options& o) -> std::unique_ptr<IConeStorage>
           {
-            return fhg::util::cxx14::make_unique
+            return std::make_unique
               <filesystem::LinearConeStorage>(o);
           }
         }
       , { "constant"
         , [](const Options& o) -> std::unique_ptr<IConeStorage>
           {
-            return fhg::util::cxx14::make_unique
+            return std::make_unique
               <filesystem::ConstantConeStorage>(o);
           }
         }
       , { "rpc"
         , [](const Options& o) -> std::unique_ptr<IConeStorage>
           {
-            return fhg::util::cxx14::make_unique
+            return std::make_unique
               <rpc::Client> (o);
           }
         }

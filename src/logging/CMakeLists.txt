@@ -1,4 +1,4 @@
-include (add_macros)
+include (util-cmake/add_macros)
 
 extended_add_library (
   NAME Logging
@@ -10,7 +10,8 @@ extended_add_library (
           "command_line_args_printer.cpp"
           "format.cpp"
           "statistics/counter_dump_reader.cpp"
-  LIBRARIES GPISpace::workflow_development
+  LIBRARIES 
+    PRIVATE GPISpace::workflow_development
             GPISpace::execution
             Util::Generic
   POSITION_INDEPENDENT

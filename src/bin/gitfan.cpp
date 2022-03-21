@@ -6,11 +6,11 @@
 #include <drts/drts.hpp>
 #include <drts/scoped_rifd.hpp>
 
-#include <fhg/util/boost/program_options/generic.hpp>
-#include <fhg/util/boost/program_options/validators/existing_path.hpp>
-#include <fhg/util/boost/program_options/validators/nonexisting_path.hpp>
-#include <fhg/util/boost/program_options/validators/positive_integral.hpp>
-#include <fhg/util/boost/program_options/validators/nonempty_file.hpp>
+#include <util-generic/boost/program_options/generic.hpp>
+#include <util-generic/boost/program_options/validators/existing_path.hpp>
+#include <util-generic/boost/program_options/validators/nonexisting_path.hpp>
+#include <util-generic/boost/program_options/validators/positive_integral.hpp>
+#include <util-generic/boost/program_options/validators/nonempty_file.hpp>
 
 #include <we/type/value/poke.hpp>
 #include <we/type/value/show.hpp>

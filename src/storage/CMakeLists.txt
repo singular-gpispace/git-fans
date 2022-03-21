@@ -7,8 +7,10 @@ extended_add_library (NAME storage
           "filesystem/string_container.cpp"
           "filesystem/linear_conestorage.cpp"
           "filesystem/constant_conestorage.cpp"
+  COMPILE_DEFINITIONS
+    BOOST_COROUTINES_NO_DEPRECATION_WARNING
   LIBRARIES Util::Generic
             Util::Logging
-            RPC
+            Util::RPC
   POSITION_INDEPENDENT
 )

@@ -1,3 +1,5 @@
+include(util-cmake/add_unit_test)
+
 add_subdirectory(singular_data)
 set (SINGULAR_TESTDATA_DIR "${CMAKE_CURRENT_BINARY_DIR}/singular_data")
 

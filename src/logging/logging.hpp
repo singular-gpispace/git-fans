@@ -8,12 +8,12 @@
 
 #include <drts/worker/context.hpp>
 
-#include <util-generic/cxx14/make_unique.hpp>
 
 #include <iostream>
+#include <map>
 #include <memory>
 #include <mutex>
-#include <map>
+
 
 namespace gitfan {
 namespace logging
@@ -44,7 +44,7 @@ namespace logging
             std::lock_guard<std::mutex> lock(_mutex);
             if (!_)
             {
-              _ = fhg::util::cxx14::make_unique<Log>();
+              _ = std::make_unique<Log>();
             }
           });
         }
@@ -55,7 +55,7 @@ namespace logging
           std::call_once(flag, [&]
           {
             std::lock_guard<std::mutex> lock(_mutex);
-            _ = fhg::util::cxx14::make_unique<Log>
+            _ = std::make_unique<Log>
               (workerName, LoggingOptions(loggingOptions));
             instanceOptions = loggingOptions;
           });

@@ -2,7 +2,6 @@
 
 #include <storage/rpc/server.hpp>
 
-#include <util-generic/cxx14/make_unique.hpp>
 
 #include <memory>
 
@@ -22,7 +21,7 @@ namespace gitfan
             , [](const Options& o)
                 -> std::unique_ptr<ServiceProvider::Implementation>
               {
-                return fhg::util::cxx14::make_unique<rpc::Server> (o);
+                return std::make_unique<rpc::Server> (o);
               }
             }
           };
@@ -33,7 +32,7 @@ namespace gitfan
     ServiceProvider::ServiceProvider(const Options& options)
       : _options(options)
       , _impl(factory().find(options.implementationTag) == factory().end()
-             ? fhg::util::cxx14::make_unique<ServiceProvider::Implementation>()
+             ? std::make_unique<ServiceProvider::Implementation>()
              : factory().at(options.implementationTag)(options)
              )
     {}

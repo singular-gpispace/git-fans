@@ -1,4 +1,4 @@
-include (add_macros)
+include (util-cmake/add_macros)
 
 macro(add_util_gitfan_library suffix type)
   extended_add_library (

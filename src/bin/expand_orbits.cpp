@@ -1,7 +1,7 @@
 #include <boost/range/adaptor/transformed.hpp>
 
-#include <fhg/util/boost/program_options/generic.hpp>
-#include <fhg/util/boost/program_options/validators/existing_path.hpp>
+#include <util-generic/boost/program_options/generic.hpp>
+#include <util-generic/boost/program_options/validators/existing_path.hpp>
 
 #include <util-generic/print_exception.hpp>
 #include <util-generic/read_lines.hpp>

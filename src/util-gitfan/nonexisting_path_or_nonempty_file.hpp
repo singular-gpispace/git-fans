@@ -1,6 +1,6 @@
 #pragma once
 
-#include <fhg/util/boost/program_options/validators.hpp>
+#include <util-generic/boost/program_options/validators.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>

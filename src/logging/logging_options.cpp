@@ -4,8 +4,8 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/serialization/optional.hpp>
 
-#include <fhg/util/boost/program_options/generic.hpp>
-#include <fhg/util/boost/program_options/validators/nonexisting_path.hpp>
+#include <util-generic/boost/program_options/generic.hpp>
+#include <util-generic/boost/program_options/validators/nonexisting_path.hpp>
 
 #include <util-generic/serialization/boost/filesystem/path.hpp>
 

@@ -4,7 +4,7 @@
 
 #include <util-generic/serialization/boost/filesystem/path.hpp>
 
-#include <rpc/function_description.hpp>
+#include <util-rpc/function_description.hpp>
 
 #include <boost/filesystem/path.hpp>
 

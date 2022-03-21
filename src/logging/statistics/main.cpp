@@ -1,5 +1,5 @@
-#include <fhg/util/boost/program_options/generic.hpp>
-#include <fhg/util/boost/program_options/validators/existing_path.hpp>
+#include <util-generic/boost/program_options/generic.hpp>
+#include <util-generic/boost/program_options/validators/existing_path.hpp>
 
 #include <logging/statistics/performance_dump_reader.hpp>
 #include <logging/statistics/counter_dump_reader.hpp>
