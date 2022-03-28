@@ -86,6 +86,7 @@ namespace rpc
     , _rpc_server (_io_service, _service_dispatcher, _lock)
     , _last_flush_time(std::chrono::steady_clock::now())
   {
+    // std::cout << "Look, the rpc server has been started" << std::endl;
     auto evolution_path (options.workingDirectory);
     auto marked_path (options.workingDirectory);
     auto unmarked_path (options.workingDirectory);

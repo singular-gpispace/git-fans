@@ -9,7 +9,7 @@ set (CMAKE_CXX_STANDARD 14)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=deprecated-copy")
+# set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=deprecated-copy")
 
 set (PNET "gitfan.pnet")
 set (WORKFLOW_INSTALLATION "workflow")
@@ -53,19 +53,19 @@ include (util-cmake/add_macros)
 
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
-# list (APPEND INSTALL_RPATH_DIRS "libexec/bundle/gpispace/lib")
+list (APPEND INSTALL_RPATH_DIRS "libexec/bundle/gpispace/lib")
 find_package (Singular REQUIRED)
 
-# set (BUNDLE_GPISPACE "libexec/bundle/gpispace")
-# bundle_GPISpace (DESTINATION "${BUNDLE_GPISPACE}"
-#   COMPONENTS "runtime"
-#              "monitoring"
-# )
+set (BUNDLE_GPISPACE "libexec/bundle/gpispace")
+bundle_GPISpace (DESTINATION "${BUNDLE_GPISPACE}"
+  COMPONENTS "runtime"
+             "monitoring"
+)
 
-# install (DIRECTORY "${SINGULAR_HOME}/"
-#   DESTINATION libexec/bundle/singular
-#   USE_SOURCE_PERMISSIONS
-# )
+install (DIRECTORY "${SINGULAR_HOME}/"
+  DESTINATION libexec/bundle/singular
+  USE_SOURCE_PERMISSIONS
+)
 
 include_directories ("${CMAKE_SOURCE_DIR}/src")
 include_directories ("${CMAKE_BINARY_DIR}")

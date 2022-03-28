@@ -18,18 +18,35 @@
 #include <functional>
 
 #define RESOLVE_INTERFACE_FUNCTION(function) \
-  ::gitfan::interface::resolve<decltype(::gitfan::interface::function)> \
-    (BOOST_PP_STRINGIZE(function))
-
+  (fhg::util::scoped_dlhandle \
+    (config::gitfanInterfaceLibrary(), RTLD_GLOBAL | RTLD_NOW | RTLD_DEEPBIND) \
+    .sym<decltype(::gitfan::interface::function)>(BOOST_PP_STRINGIZE(function)))
+    
+#include <iostream>
 namespace gitfan {
 namespace interface
 {
   template <typename T>
-  std::function<T> resolve(const std::string& symbol)
+  auto resolve(const std::string& symbol)
   {
-    return fhg::util::scoped_dlhandle
-      (config::gitfanInterfaceLibrary(), RTLD_GLOBAL | RTLD_NOW | RTLD_DEEPBIND)
-      .sym<T>(symbol);
+    // std::cout << "RESOLVE " << symbol << std::endl;
+    // std::cout << config::gitfanInterfaceLibrary() << std::endl;
+    auto h =  fhg::util::scoped_dlhandle
+      (config::gitfanInterfaceLibrary());
+      // std::cout << "LIBRARY opened" << std::endl;
+    auto s = h.sym<T>(symbol);
+    // std::cout << "symbol load from library" << std::endl;
+    return s;
+  }
+  template<typename T, typename... Args>
+  auto resolve_and_call (std::string const& symbol, Args&&... args)
+  {
+    auto h =  fhg::util::scoped_dlhandle
+      (config::gitfanInterfaceLibrary());
+      // std::cout << "lkj LIBRARY opened" << std::endl;
+    auto s = h.sym<T>(symbol);
+    // std::cout << "lkj symbol load from library" << std::endl;
+return s (std::forward<Args> (args)...);
   }
 
   NO_NAME_MANGLING

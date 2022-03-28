@@ -21,6 +21,7 @@ namespace gitfan
             , [](const Options& o)
                 -> std::unique_ptr<ServiceProvider::Implementation>
               {
+                // std::cout << "Yeah" << std::endl;
                 return std::make_unique<rpc::Server> (o);
               }
             }
@@ -31,9 +32,9 @@ namespace gitfan
 
     ServiceProvider::ServiceProvider(const Options& options)
       : _options(options)
-      , _impl(factory().find(options.implementationTag) == factory().end()
+      , _impl(factory().find(_options.implementationTag) == factory().end()
              ? std::make_unique<ServiceProvider::Implementation>()
-             : factory().at(options.implementationTag)(options)
+             : factory().at(_options.implementationTag)(_options)
              )
     {}
   }

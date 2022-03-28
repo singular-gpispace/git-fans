@@ -181,10 +181,13 @@ try
   gspc::scoped_runtime_system const drts
     (vm, gspc_installation, topology_description.str(), rifds.entry_points());
 
+auto const ppp = option::conestorage_option.get_from (vm);
+// std::cout << ppp.size() << std::endl;
+// std::cout << workingDirectory << std::endl;
+auto sym = RESOLVE_INTERFACE_FUNCTION(initStorageOptions) (ppp, workingDirectory);
+// std::cout << "nice guys, that worked out okay" << std::endl;
   gitfan::storage::ServiceProvider storageServiceProvider
-    (
-      RESOLVE_INTERFACE_FUNCTION(initStorageOptions)
-        (option::conestorage_option.get_from (vm), workingDirectory)
+    (sym
     );
 
   gitfan::pnet_problem_data data;

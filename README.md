@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # GIT-Fans
 
 This repository accompanies the master's thesis ["Computation of the GIT-fan using a massively parallel implementation"](https://github.com/ChristianReinbold/git-fan_master-thesis/blob/master/build/abschlussarbeit.pdf). It enables the computation of GIT-Fans in massively parallel fashion on scalable hardware systems.
@@ -128,7 +127,3 @@ $GITFAN_HOME/bin/generate_statistics \
 ```
 
 For further details about usage, please pass the `--help` to the GITFAN executable or result Section 4.6 & 4.7 of the [master's thesis](https://github.com/ChristianReinbold/git-fan_master-thesis/blob/master/build/abschlussarbeit.pdf).
-=======
-# gitfans_CR
-Git fan repo of Christian Reinbold
->>>>>>> f87a5c5e8407b2d9d2f9ffe126d9698938942a7f
