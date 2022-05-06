@@ -1,6 +1,3 @@
-# Note: Does _NOT_ track external dependencies!
-#          --gen-ldflags="-L${CMAKE_BINARY_DIR}"
-
 macro(copy_petrinet_over_to_build name)
   configure_file("${CMAKE_CURRENT_SOURCE_DIR}/${name}.xpnet" "${CMAKE_CURRENT_BINARY_DIR}/${name}.xpnet" COPYONLY)
 endmacro()
@@ -53,28 +50,15 @@ macro(add_petrinet in out)
   add_custom_command (
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/gen_${out}/pnetc/op/libgitfan.so"
            ${gen_type_op_sources}
-    COMMAND # "${GSPC_HOME}/bin/pnetc"
+    COMMAND 
         GPISpace::pnetc
-            # --search-path="${GSPC_HOME}/share/gspc/xml"
-            # --search-path="${GSPC_HOME}/share/gspc/xml/lib"
             --gen-cxxflags=-std=c++14
             --gen-cxxflags=-I"${CMAKE_SOURCE_DIR}"
             --gen-cxxflags=-I"${CMAKE_SOURCE_DIR}/src"
             --gen-cxxflags=-I"${CMAKE_BINARY_DIR}/src"
-            # --gen-cxxflags=-I"${GPISPACE_REPO}/src"
-            # --gen-cxxflags=-I"${GSPC_HOME}/include"
-            # --gen-cxxflags=-I"${GSPC_HOME}/external/boost/include"
-            # --gen-ldflags="-L${CMAKE_BINARY_DIR}/src/logging"
-            # --gen-ldflags="-lUtil-Logging"
             --gen-ldflags="$<TARGET_LINKER_FILE:Util::Logging>"
-            # --gen-ldflags="-L${CMAKE_BINARY_DIR}/src/util-generic"
-            # --gen-ldflags="-lUtil-Generic"
             --gen-ldflags="$<TARGET_LINKER_FILE:Util::Generic>"
-            # --gen-ldflags="-L${GSPC_HOME}/external/boost/lib"
             --gen-ldflags="-lboost_program_options"
-            # --gen-ldflags="-Wl,-rpath='\\$\$\\$\$ORIGIN'"
-            # --gen-ldflags="-Wl,-rpath='\\$\$\\$\$ORIGIN/../libexec/bundle/gpispace/lib'"
-            # --gen-ldflags="-Wl,-rpath='\\$\$\\$\$ORIGIN/../libexec/bundle/gpispace/external/boost/lib'"
             --force-overwrite-file=true
             --input="${CMAKE_CURRENT_BINARY_DIR}/${in}"
             --output="${CMAKE_CURRENT_BINARY_DIR}/${out}"

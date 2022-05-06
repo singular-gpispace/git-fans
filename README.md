@@ -19,7 +19,7 @@ GIT-Fans requires a compatible Singular installation and has been tested with a 
 
 #### Building GPI-Space
 
-To build GIT-Fans, the sources as well as a working installation of [GPI-Space v20.12](https://github.com/cc-hpc-itwm/gpispace/tree/v20.12) are required. Check out GPI-Space v20.12 and proceed according to the GPI-Space installation guide. We used the following versions of depending packages:
+To build GIT-Fans, the sources as well as a working installation of [GPI-Space v22.03](https://github.com/cc-hpc-itwm/gpispace/tree/v22.03) are required. Check out GPI-Space v22.03 and proceed according to the GPI-Space installation guide. We used the following versions of depending packages:
 
 * [OpenSSL](https://www.openssl.org/) 1.1.1
 * [hwloc](https://www.open-mpi.org/projects/hwloc/) 2.1.0
@@ -86,24 +86,23 @@ GIT-Fans can either be used locally or in union with a job scheduler such as SLU
 ```bash
 set -euo pipefail
 
-GITFAN_HOME=<path to GIT-Fans install>
-GITFAN_REPO=<path to GIT-Fans repo from which sample input files are read>
-WDIR=<path to working directory where GIT-Fans generates all output>
+scriptfile=$(readlink -f "${BASH_SOURCE[0]}")
+current_dir="${scriptfile%/*}"
 
-NODEFILE=`generate_pbs_nodefile || :`
-if [ -z "$NODEFILE" ] || [ ! -f $NODEFILE ];
-then
-  echo "Warning, not in cluster session. Run on $HOSTNAME instead"
-  NODEFILE=`mktemp`
-  echo $HOSTNAME > $NODEFILE
-fi
-trap "rm -f $NODEFILE" EXIT SIGHUP SIGINT SIGQUIT SIGTERM
+export LD_LIBRARY_PATH=${GPISpace_ROOT}/lib:$LD_LIBRARY_PATH
+
+GITFAN_HOME=${current_dir}/install
+GITFAN_REPO=${current_dir}/git-fans
+WDIR=/scratch/${USER}/git-fans
+
+NODEFILE="${current_dir}/nodefile"
+scontrol show hostnames > $NODEFILE
 
 if [[ -d "$WDIR" ]];
 then
-  echo "Working directory exists."
-  exit 1
+  rm -rf ${WDIR}
 fi
+
 
 $GITFAN_HOME/bin/GITFAN \
     --nodefile $NODEFILE \

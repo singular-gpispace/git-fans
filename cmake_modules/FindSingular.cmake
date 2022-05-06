@@ -79,7 +79,6 @@ find_package_handle_standard_args (Singular
 extended_add_library (NAME Singular
   SYSTEM_INCLUDE_DIRECTORIES INTERFACE
     "${SINGULAR_INCLUDE_DIR}"
-     #! \todo fix singular -> open issue there "please use one root only"
     "${SINGULAR_INCLUDE_DIR}/singular"
     "${GMP_INCLUDE_DIR}"
   LIBRARIES ${SINGULAR_LIBRARY}
@@ -88,5 +87,3 @@ extended_add_library (NAME Singular
             ${OMALLOC_LIBRARY}
             ${GMP_LIBRARY}
 )
-
-#! \todo bundling
