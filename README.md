@@ -10,6 +10,8 @@ The GIT fan of an algebraic group action on an algebraic variety describes all G
 
 The project as well as its dependencies have been built on Ubuntu 20.04 LTS with [GCC](https://gcc.gnu.org/) 9.3.0 and [CMake](https://cmake.org/) 3.16.3. The build process and execution on other setups may or may not succeed.
 
+Note: This package is not yet part of our framework of Spack packages, so it requires manual installation. A Spack package will soon be available.
+
 #### Building Singular
 
 GIT-Fans requires a compatible Singular installation and has been tested with a build of [Singular 4.1.3p2](https://github.com/Singular/Singular/tree/Release-4-1-3p2). Make sure to build Singular from sources according to the Singular installation guide. In our test environment, the following Singular dependencies has been installed as well:
